@@ -337,11 +337,13 @@ public class NodeTool
     {
         public void run(INodeProbeFactory nodeProbeFactory, Output output)
         {
-            run();
+            StringBuilder sb = new StringBuilder();
+            help(global, command, sb);
+            output.out.println(sb);
         }
     }
 
-    interface NodeToolCmdRunnable
+    public interface NodeToolCmdRunnable
     {
         void run(INodeProbeFactory nodeProbeFactory, Output output);
     }

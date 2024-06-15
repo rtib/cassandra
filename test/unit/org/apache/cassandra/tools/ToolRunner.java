@@ -191,6 +191,11 @@ public class ToolRunner
         return invoke(CQLTester.buildNodetoolArgs(args));
     }
 
+    public static ToolResult invokeNodetool(Map<String, String> env, List<String> args)
+    {
+        return invoke(env, CQLTester.buildNodetoolArgs(args));
+    }
+
     public static ToolResult invoke(List<String> args)
     {
         return invoke(args.toArray(new String[args.size()]));
