@@ -19,6 +19,7 @@
 package org.apache.cassandra.management;
 
 import java.util.Arrays;
+import java.util.Collection;
 
 public final class CommandUtils
 {
@@ -35,5 +36,23 @@ public final class CommandUtils
         char[] buff = new char[num];
         Arrays.fill(buff, ' ');
         return new String(buff);
+    }
+
+    public static int maxLength(Collection<?> any)
+    {
+        int result = 0;
+        for (Object value : any)
+            result = Math.max(result, String.valueOf(value).length());
+        return result;
+    }
+
+    public static boolean empty(String str)
+    {
+        return str == null || str.trim().isEmpty();
+    }
+
+    private static boolean empty(Object[] array)
+    {
+        return array == null || array.length == 0;
     }
 }

@@ -23,8 +23,10 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
@@ -32,8 +34,8 @@ import com.google.common.base.Preconditions;
 import org.apache.cassandra.utils.AbstractGuavaIterator;
 import picocli.CommandLine;
 
-import static com.google.common.collect.ObjectArrays.concat;
 import static org.apache.cassandra.management.CommandUtils.leadingSpaces;
+import static org.apache.commons.lang3.ArrayUtils.isEmpty;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST_HEADING;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_DESCRIPTION;
@@ -64,6 +66,7 @@ public class CassandraHelpLayout extends CommandLine.Help
     private static final String OPTIONS_HEADING = "OPTIONS%n";
     private static final int COLUMN_INDENT = 8;
     private static final int DESCRIPTION_INDENT = 4;
+    private static final int SUBCOMMANDS_INDENT = 4;
     private static final CommandLine.Model.OptionSpec CASSANDRA_END_OF_OPTIONS_OPTION =
         CommandLine.Model.OptionSpec.builder("--")
                                     .description("This option can be used to separate command-line options from the " +
@@ -71,6 +74,9 @@ public class CassandraHelpLayout extends CommandLine.Help
                                                  "command-line options")
                                     .arity("0")
                                     .build();
+    private static final String TOP_LEVEL_SYNOPSIS_LIST_HEADING = "usage:";
+    private static final String TOP_LEVEL_COMMAND_HEADING = "The most commonly used nodetool commands are:%n";
+    private static final String TOP_LEVEL_SYNOPSIS_SUBCOMMANDS_LABEL = "<command> [<args>]";
 
     public CassandraHelpLayout(CommandLine.Model.CommandSpec spec, ColorScheme scheme)
     {
@@ -120,59 +126,84 @@ public class CassandraHelpLayout extends CommandLine.Help
         // Cassandra uses end of options delimiter in usage help.
         commandSpec().usageMessage().showEndOfOptionsDelimiterInUsageHelp(true);
 
+        CommandLine.Model.CommandSpec commandSpec = commandSpec();
+        ColorScheme colorScheme = colorScheme();
+
         Set<CommandLine.Model.ArgSpec> argsInGroups = new HashSet<>();
         Ansi.Text groupsText = createDetailedSynopsisGroupsText(argsInGroups);
-
         List<Ansi.Text> optionsList = createCassandraSynopsisOptionsText(argsInGroups);
         Ansi.Text endOfOptionsText = createDetailedSynopsisEndOfOptionsText();
         Ansi.Text positionalParamText = createCassandraSynopsisPositionalsText(argsInGroups);
         Ansi.Text commandText = createDetailedSynopsisCommandText();
 
-        CommandLine.Model.CommandSpec commandSpec = commandSpec();
-        String parentCommandName = commandSpec.parent().qualifiedName();
-        ColorScheme colorScheme = colorScheme();
+        boolean isTopLevelCommand = commandSpec.parent() == null;
+        String parentCommandName = isTopLevelCommand ? "" : commandSpec.parent().qualifiedName();
+        int width = commandSpec.usageMessage().width();
 
-        int leadingColumnWidth = parentCommandName.length() + COLUMN_INDENT;
-        int followingColumnWidth = commandSpec.usageMessage().width() - leadingColumnWidth;
-        TextTable textTable = TextTable.forColumns(colorScheme,
-                                                   new Column(leadingColumnWidth, 0, Column.Overflow.TRUNCATE),
-                                                   new Column(followingColumnWidth, 0, Column.Overflow.WRAP));
+        Ansi.Text parentCommandText = isTopLevelCommand ? colorScheme.commandText(commandSpec.name())
+                                      : colorScheme.commandText(parentCommandName);
+        TextTable textTable = TextTable.forColumns(colorScheme, new Column(width, COLUMN_INDENT, Column.Overflow.WRAP));
+        textTable.indentWrappedLines = parentCommandText.plainString().length();
         textTable.setAdjustLineBreaksForWideCJKCharacters(commandSpec.usageMessage().adjustLineBreaksForWideCJKCharacters());
-        textTable.indentWrappedLines = 0;
 
-        Ansi.Text emptyCell = Ansi.OFF.new Text(leadingSpaces(leadingColumnWidth), colorScheme);
-        Ansi.Text cmdPadding = Ansi.OFF.new Text(leadingSpaces(COLUMN_INDENT), colorScheme);
-        Ansi.Text parentCommandText = cmdPadding.concat(colorScheme.commandText(parentCommandName)).concat(" ");
         // All other fields added to the synopsis are left-adjusted, so we don't need to align them.
-        Ansi.Text text = groupsText.concat(" ")
-                                   .concat(commandSpec.name())
-                                   .concat(endOfOptionsText)
-                                   .concat(" ")
-                                   .concat(positionalParamText)
-                                   .concat(commandText);
-
-        LineBreakingOptionsIterator iter = new LineBreakingOptionsIterator(optionsList.iterator(), followingColumnWidth);
-        boolean commandTextNotAdded = true;
-        while (iter.hasNext())
+        Ansi.Text text;
+        if (isTopLevelCommand)
         {
-            Ansi.Text row = iter.next();
-            Ansi.Text leadingCell = emptyCell;
+            text = groupsText.concat(" ")
+                                       .concat(TOP_LEVEL_SYNOPSIS_LIST_HEADING)
+                                       .concat(" ")
+                                       .concat(positionalParamText)
+                                       .concat(commandText);
 
-            if (commandTextNotAdded)
-            {
-                leadingCell = parentCommandText;
-                row = colorScheme.text(" ").concat(row);
-                commandTextNotAdded = false;
-            }
-
-            if (iter.hasNext())
-                textTable.addRowValues(leadingCell, row);
-            else
-                textTable.addRowValues(leadingCell, row.concat(text));
+            textTable.addRowValues(text);
+            textTable.addEmptyRow();
+        }
+        else
+        {
+            text = groupsText.concat(" ").concat(commandSpec.name()).concat(endOfOptionsText).concat(" ")
+                                       .concat(positionalParamText).concat(commandText);
         }
 
-        textTable.addRowValues(Ansi.OFF.new Text("", colorScheme));
+        Ansi.Text padding = Ansi.OFF.new Text(leadingSpaces(parentCommandText.plainString().length()), colorScheme);
+        List<Ansi.Text> alignedOptions = alignByWidth(optionsList,
+                                                      width - COLUMN_INDENT - textTable.indentWrappedLines,
+                                                      colorScheme);
+        // Align options by width
+        for (int i = 0; i < alignedOptions.size(); i++)
+        {
+            Ansi.Text option = alignedOptions.get(i);
+            if (i == 0)
+                option = parentCommandText.concat(" ").concat(option);
+            else
+                option = padding.concat(option);
+
+            if (i == alignedOptions.size() - 1)
+                textTable.addRowValues(option.concat(text));
+            else
+                textTable.addRowValues(option);
+        }
+
+        textTable.addEmptyRow();
         return textTable.toString();
+    }
+
+    private static List<Ansi.Text> alignByWidth(List<Ansi.Text> optionsList, int width, ColorScheme colorScheme)
+    {
+        List<Ansi.Text> result = new ArrayList<>();
+        Ansi.Text current = Ansi.OFF.new Text("", colorScheme);
+        for (Ansi.Text option : optionsList)
+        {
+            if (current.plainString().length() + option.plainString().length() >= width)
+            {
+                result.add(current);
+                current = Ansi.OFF.new Text("", colorScheme);
+            }
+            current = current.plainString().isEmpty() ? option : current.concat(" ").concat(option);
+        }
+        if (!current.plainString().isEmpty())
+            result.add(current);
+        return result;
     }
 
     private Ansi.Text createCassandraSynopsisPositionalsText(Collection<CommandLine.Model.ArgSpec> done)
@@ -291,9 +322,40 @@ public class CassandraHelpLayout extends CommandLine.Help
     }
 
     @Override
+    public String commandList(Map<String, CommandLine.Help> subcommands)
+    {
+        if (subcommands.isEmpty())
+            return "";
+        int width = commandSpec().usageMessage().width();
+        int commandLength = Math.min(CommandUtils.maxLength(subcommands.keySet()), width / 2);
+        int leadinColumnWidth = commandLength + SUBCOMMANDS_INDENT;
+        CommandLine.Help.TextTable table = TextTable.forColumns(colorScheme(),
+                                                                new CommandLine.Help.Column(leadinColumnWidth, SUBCOMMANDS_INDENT,
+                                                                                            CommandLine.Help.Column.Overflow.SPAN),
+                                                                new CommandLine.Help.Column(width - leadinColumnWidth, SUBCOMMANDS_INDENT,
+                                                                                            CommandLine.Help.Column.Overflow.WRAP));
+        table.setAdjustLineBreaksForWideCJKCharacters(commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters());
+
+        for (Map.Entry<String, CommandLine.Help> entry : subcommands.entrySet())
+        {
+            CommandLine.Help help = entry.getValue();
+            CommandLine.Model.UsageMessageSpec usage = help.commandSpec().usageMessage();
+            String header = isEmpty(usage.header()) ? (isEmpty(usage.description()) ? "" : usage.description()[0]) : usage.header()[0];
+            Ansi.Text[] lines = colorScheme().text(header).splitLines();
+            for (int i = 0; i < lines.length; i++)
+                table.addRowValues(i == 0 ? help.commandNamesText(", ") : Ansi.OFF.new Text(0), lines[i]);
+        }
+        return table.toString();
+    }
+
+    @Override
     public String footerHeading(Object... params)
     {
         return createHeading("%n", params);
+    }
+
+    public String topLevelCommandListHeading(Object... params) {
+        return createHeading(TOP_LEVEL_COMMAND_HEADING, params);
     }
 
     private static List<CommandLine.Model.PositionalParamSpec> cassandraPositionals(CommandLine.Model.CommandSpec commandSpec)
@@ -343,54 +405,25 @@ public class CassandraHelpLayout extends CommandLine.Help
         return result;
     }
 
-    private static class LineBreakingOptionsIterator extends AbstractGuavaIterator<Ansi.Text>
+    /**
+     * Top-level help command (includes all the available nodetool commands) has a different layout, so we need to
+     * provide a different set of keys for the help sections.
+     * @param layout The help class layout.
+     * @return Map of supported keys for the help sections.
+     */
+    public static Map<String, CommandLine.IHelpSectionRenderer> cassandraTopLevelHelpSectionKeys(CassandraHelpLayout layout)
     {
-        private final Iterator<Ansi.Text> optionsIterator;
-        private final int width;
-        private Ansi.Text prev;
-
-        LineBreakingOptionsIterator(Iterator<Ansi.Text> optionsIterator, int width)
-        {
-            this.optionsIterator = optionsIterator;
-            this.width = width;
-        }
-
-        @Override
-        protected Ansi.Text computeNext()
-        {
-            while (optionsIterator.hasNext())
-            {
-                Ansi.Text next = optionsIterator.next();
-                if (prev == null)
-                    prev = next;
-
-                Ansi.Text curr;
-                if (prev == next)
-                    curr = next;
-                else
-                    curr = prev.concat(" ").concat(next);
-
-                if (curr.plainString().length() > width)
-                {
-                    Ansi.Text result = prev;
-                    prev = next;
-                    return result;
-                }
-                else
-                {
-                    prev = curr;
-                }
-            }
-
-            if (prev == null)
-                return endOfData();
-            else
-            {
-                Ansi.Text result = prev;
-                prev = null;
-                return result;
-            }
-        }
+        Map<String, CommandLine.IHelpSectionRenderer> sectionMap = new LinkedHashMap<>();
+        sectionMap.put(SECTION_KEY_HEADER_HEADING, CommandLine.Help::headerHeading);
+        sectionMap.put(SECTION_KEY_HEADER, CommandLine.Help::header);
+        sectionMap.put(SECTION_KEY_SYNOPSIS, help -> help.synopsis(help.synopsisHeadingLength()));
+        sectionMap.put(SECTION_KEY_COMMAND_LIST_HEADING, layout::topLevelCommandListHeading);
+        sectionMap.put(SECTION_KEY_COMMAND_LIST, CommandLine.Help::commandList);
+        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST_HEADING, CommandLine.Help::exitCodeListHeading);
+        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST, CommandLine.Help::exitCodeList);
+        sectionMap.put(SECTION_KEY_FOOTER_HEADING, CommandLine.Help::footerHeading);
+        sectionMap.put(SECTION_KEY_FOOTER, CommandLine.Help::footer);
+        return sectionMap;
     }
 
     private static Ansi.Text spacedParamLabel(CommandLine.Model.OptionSpec optionSpec,

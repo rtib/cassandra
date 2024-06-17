@@ -18,14 +18,12 @@
 
 package org.apache.cassandra.tools;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.function.BiFunction;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 
@@ -33,55 +31,74 @@ import com.github.difflib.DiffUtils;
 import com.github.difflib.patch.AbstractDelta;
 import com.github.difflib.patch.Patch;
 import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.tools.ToolRunner.ToolResult;
 
-import static org.apache.cassandra.tools.ToolRunner.invokeNodetool;
 import static org.junit.Assert.assertTrue;
 
 public class NodeToolSynopsisTest
 {
-    private static final Map<String, String> NODETOOLV2_ENV = ImmutableMap.of("NODETOOL_RUNNER", "org.apache.cassandra.tools.NodeToolV2");
-
-    @Test
-    public void cliHelpForcecompact()
-    {
-        ToolResult toolHistory = invokeNodetool(List.of("help", "forcecompact"));
-        toolHistory.assertOnCleanExit();
-        String outputV1 = toolHistory.getStdout();
-
-        toolHistory = invokeNodetool(NODETOOLV2_ENV, List.of("help", "forcecompact"));
-        String outputV2 = toolHistory.getStdout();
-    }
-
     @Test
     public void cliHelp()
     {
-        ToolResult toolHistory = invokeNodetool("help");
-        toolHistory.assertOnCleanExit();
-        String outputV1 = toolHistory.getStdout();
+        List<String> outNodeTool = invokeNodetool(NodeTool::new, "help");
+        List<String> outNodeToolV2 = invokeNodetool(NodeToolV2::new, "help");
 
-        toolHistory = invokeNodetool(NODETOOLV2_ENV, List.of("help"));
-        String outputV2 = toolHistory.getStdout();
+        String diff = computeDiff(outNodeTool, outNodeToolV2);
+        assertTrue(concatNodetoolOutput(outNodeTool) +
+                   '\n' + "-----------------------------------------------------" +
+                   '\n' + concatNodetoolOutput(outNodeToolV2) +
+                   '\n' + "Difference for \"" + "help" + "\":" + diff,
+                   StringUtils.isBlank(diff));
     }
 
     @Test
-    public void cliDryRun() throws Exception
+    public void dummy()
     {
-        List<String> args = CQLTester.buildNodetoolArgs(List.of("help", "assassinate"));
-        args.remove("bin/nodetool");
-        ListOutputStream outputV1 = new ListOutputStream();
-        ListOutputStream outputV2 = new ListOutputStream();
+        List<String> outNodeToolV2 = invokeNodetool(NodeToolV2::new, "help");
+        System.out.println(concatNodetoolOutput(outNodeToolV2));
+    }
 
-        new NodeTool(new NodeProbeFactory(), new Output(new PrintStream(outputV1), new PrintStream(outputV1)))
-            .execute(args.toArray(new String[0]));
-        new NodeToolV2(new NodeProbeFactory(), new Output(new PrintStream(outputV2), new PrintStream(outputV2)))
-            .execute(args.toArray(new String[0]));
+    @Test
+    public void compareNodeToolHelpOutput() throws Exception
+    {
+//        runCommandHelpOutputComparison("abortbootstrap");
+        runCommandHelpOutputComparison("assassinate");
+        runCommandHelpOutputComparison("forcecompact");
+    }
 
-        String diff = computeDiff(outputV1.getOutputLines(), outputV2.getOutputLines());
-        assertTrue(String.join("\n", outputV1.getOutputLines()) +
-                   '\n' + String.join("\n", outputV2.getOutputLines()) +
-                   '\n' + " difference: " + diff,
+    public void runCommandHelpOutputComparison(String commandName)
+    {
+        List<String> outNodeTool = invokeNodetool(NodeTool::new, "help", commandName);
+        List<String> outNodeToolV2 = invokeNodetool(NodeToolV2::new, "help", commandName);
+        String diff = computeDiff(outNodeTool, outNodeToolV2);
+        assertTrue(concatNodetoolOutput(outNodeTool) +
+                   '\n' + "-----------------------------------------------------" +
+                   '\n' + concatNodetoolOutput(outNodeToolV2) +
+                   '\n' + " difference for \"" + commandName + "\":" + diff,
                    StringUtils.isBlank(diff));
+    }
+
+    private static String concatNodetoolOutput(List<String> output)
+    {
+        return '\n' + String.join("\n", output);
+    }
+    private static List<String> invokeNodetool(BiFunction<NodeProbeFactory, Output, Object> factory, String... commands)
+    {
+        ListOutputStream output = new ListOutputStream();
+        List<String> args = CQLTester.buildNodetoolArgs(List.of(commands));
+        args.remove("bin/nodetool");
+        try
+        {
+            Object runner = factory.apply(new NodeProbeFactory(), new Output(new PrintStream(output), new PrintStream(output)));
+            Object result = runner.getClass().getMethod("execute", String[].class)
+                  .invoke(runner, new Object[] { args.toArray(new String[0]) });
+            if (result instanceof Integer && (Integer) result != 0)
+                throw new RuntimeException("Command failed with exit code " + result);
+            return output.getOutputLines();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     public static String computeDiff(List<String> original, List<String> revised) {

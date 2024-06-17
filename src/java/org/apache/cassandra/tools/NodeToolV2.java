@@ -244,11 +244,8 @@ public class NodeToolV2
         commandLine.setOut(new PrintWriter(output.out))
                     .setErr(new PrintWriter(output.err))
                     .setExecutionExceptionHandler((ex, cmdLine, parseResult) -> {
-                        if (ex instanceof CommandLine.ParameterException)
-                        {
-                            output.err.println(ex.getMessage());
-                            commandLine.usage(output.err);
-                        }
+                        output.err.println(ex.getMessage());
+                        commandLine.usage(output.err);
                         return 1;
                     });
 

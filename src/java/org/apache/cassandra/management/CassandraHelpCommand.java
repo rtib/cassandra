@@ -58,10 +58,11 @@ public class CassandraHelpCommand implements CommandLine.IHelpCommandInitializab
         CommandLine.Help.ColorScheme colors = colorScheme == null ?
                                               CommandLine.Help.defaultColorScheme(CommandLine.Help.Ansi.AUTO) :
                                               colorScheme;
-        // If no input command argument is specified, print help for the top-level command.
+
         if (commands == null)
         {
-            printUsage(parent, colors, out);
+            // If the parent command is the top-level command, print help for the top-level command.
+            printTopCommandUsage(parent, colors, out);
             return;
         }
 
@@ -74,14 +75,33 @@ public class CassandraHelpCommand implements CommandLine.IHelpCommandInitializab
         if (subcommand == null)
             throw new CommandLine.ParameterException(parent, "Unknown subcommand '" + commands + "'.", null, commands);
 
-        printUsage(subcommand, colors, out);
+        subcommand.usage(out, colors);
     }
 
-    private static void printUsage(CommandLine command, CommandLine.Help.ColorScheme colors, PrintWriter out)
+    private static void printTopCommandUsage(CommandLine command, CommandLine.Help.ColorScheme colors, PrintWriter writer)
     {
         if (command == null)
             return;
-        command.usage(out, colors);
+
+        StringBuilder sb = new StringBuilder();
+        CommandLine.Help help = command.getHelpFactory().create(command.getCommandSpec(), colors);
+        if (!(help instanceof CassandraHelpLayout))
+        {
+            command.usage(writer, colors);
+            return;
+        }
+
+        Map<String, CommandLine.IHelpSectionRenderer> helpSectionMap = CassandraHelpLayout.cassandraTopLevelHelpSectionKeys((CassandraHelpLayout) help);
+        for (String key : command.getHelpSectionKeys())
+        {
+            CommandLine.IHelpSectionRenderer renderer = helpSectionMap.get(key);
+            if (renderer == null)
+                continue;
+            sb.append(renderer.render(help));
+        }
+
+        writer.println(sb);
+        writer.flush();
     }
 
     /**
