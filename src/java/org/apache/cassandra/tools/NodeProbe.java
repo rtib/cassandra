@@ -105,7 +105,7 @@ import org.apache.cassandra.metrics.CassandraMetricsRegistry;
 import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.ThreadPoolMetrics;
-import org.apache.cassandra.management.ManagementContext;
+import org.apache.cassandra.management.ServiceBridge;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.MessagingServiceMBean;
 import org.apache.cassandra.service.ActiveRepairServiceMBean;
@@ -131,7 +131,7 @@ import static org.apache.cassandra.config.CassandraRelevantProperties.SSL_ENABLE
 /**
  * JMX client operations for Cassandra.
  */
-public class NodeProbe implements AutoCloseable, ManagementContext
+public class NodeProbe implements AutoCloseable, ServiceBridge
 {
     private static final String fmtUrl = "service:jmx:rmi:///jndi/rmi://%s:%d/jmxrmi";
     private static final String ssObjName = "org.apache.cassandra.db:type=StorageService";
@@ -240,11 +240,10 @@ public class NodeProbe implements AutoCloseable, ManagementContext
     }
 
     @Override
-    public <T> T getManagementService(Class<T> serviceClass)
+    public <T> T mBean(Class<T> clazz)
     {
-
-        return serviceClass.cast(Optional.ofNullable(cachedMBeans.get(serviceClass.getName()))
-                                         .orElseThrow(() -> new IllegalArgumentException("No MBean found for " + serviceClass.getName())));
+        return clazz.cast(Optional.ofNullable(cachedMBeans.get(clazz.getName()))
+                                  .orElseThrow(() -> new IllegalArgumentException("No MBean found for " + clazz.getName())));
     }
 
     /**

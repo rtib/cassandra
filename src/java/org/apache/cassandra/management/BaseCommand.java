@@ -18,21 +18,34 @@
 
 package org.apache.cassandra.management;
 
-import javax.inject.Inject;
+import picocli.CommandLine;
 
 /**
  * Base class for all nodetool commands.
  */
 public abstract class BaseCommand implements Runnable
 {
-    @Inject
-    protected ManagementContext probe;
+    /** The command specification, used to access command-specific properties. */
+    @CommandLine.Spec
+    protected CommandLine.Model.CommandSpec spec; // injected by picocli
+    /** The ServiceBridge instance to interact with the Cassandra node. */
+    protected ServiceBridge bridge;
+
+    /**
+     * The ServiceBridge instance is injected by the picocli framework during command execution and is used to
+     * interact with the Cassandra node. This method is called by picocli and used depending on the execution strategy.
+     * @param bridge The ServiceBridge instance to inject.
+     */
+    public void setBridge(ServiceBridge bridge)
+    {
+        this.bridge = bridge;
+    }
 
     @Override
     public void run()
     {
-        execute(probe);
+        execute(bridge);
     }
 
-    protected abstract void execute(ManagementContext probe);
+    protected abstract void execute(ServiceBridge probe);
 }

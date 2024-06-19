@@ -63,6 +63,7 @@ public class NodeToolSynopsisTest
 //        runCommandHelpOutputComparison("abortbootstrap");
         runCommandHelpOutputComparison("assassinate");
         runCommandHelpOutputComparison("forcecompact");
+        runCommandHelpOutputComparison("compact");
     }
 
     public void runCommandHelpOutputComparison(String commandName)
@@ -81,7 +82,8 @@ public class NodeToolSynopsisTest
     {
         return '\n' + String.join("\n", output);
     }
-    private static List<String> invokeNodetool(BiFunction<NodeProbeFactory, Output, Object> factory, String... commands)
+
+    public static List<String> invokeNodetool(BiFunction<NodeProbeFactory, Output, Object> factory, String... commands)
     {
         ListOutputStream output = new ListOutputStream();
         List<String> args = CQLTester.buildNodetoolArgs(List.of(commands));
@@ -117,7 +119,7 @@ public class NodeToolSynopsisTest
         return '\n' + String.join("\n", diffLines);
     }
 
-    private static class ListOutputStream extends OutputStream
+    public static class ListOutputStream extends OutputStream
     {
         private final List<String> outputLines = new ArrayList<>();
         private final StringBuilder buffer = new StringBuilder();

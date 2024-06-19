@@ -21,7 +21,7 @@ package org.apache.cassandra.management;
 /**
  * Management context for nodetool commands to access management services like StorageServiceMBean etc.
  */
-public interface ManagementContext
+public interface ServiceBridge
 {
-    <T> T getManagementService(Class<T> serviceClass);
+    <T> T mBean(Class<T> clazz);
 }

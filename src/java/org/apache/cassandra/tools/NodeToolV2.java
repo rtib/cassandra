@@ -22,12 +22,14 @@ import java.io.FileNotFoundException;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
+import javax.inject.Inject;
 import javax.management.InstanceNotFoundException;
 
 import com.google.common.base.Joiner;
@@ -50,8 +52,9 @@ import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.CassandraHelpLayout;
 import org.apache.cassandra.management.api.AbortBootstrap;
 import org.apache.cassandra.management.api.Assassinate;
+import org.apache.cassandra.management.api.Compact;
 import org.apache.cassandra.management.api.ForceCompact;
-import org.apache.cassandra.management.api.JmxConnect;
+import org.apache.cassandra.management.api.JmxConnectionMixin;
 import org.apache.cassandra.management.api.TopLevelCommand;
 import org.apache.cassandra.utils.FBUtilities;
 import picocli.CommandLine;
@@ -236,16 +239,19 @@ public class NodeToolV2
         List<Class<? extends BaseCommand>> cliCommands = newArrayList(
             AbortBootstrap.class,
             Assassinate.class,
-            ForceCompact.class);
+            ForceCompact.class,
+            Compact.class);
 
-        CommandLine commandLine = new CommandLine(new TopLevelCommand());
-//        commandLine.setExecutionStrategy(new CommandLine.RunAll());
-        commandLine.addMixin(JmxConnect.MIXIN_KEY, new JmxConnect());
+        CommandLine.IFactory factory;
+        CommandLine commandLine = new CommandLine(new TopLevelCommand(), factory = new CassandraCliFactory(nodeProbeFactory, output));
+        commandLine.setExecutionStrategy(JmxConnectionMixin::executionStrategy);
+
+        JmxConnectionMixin mixin = create(factory, JmxConnectionMixin.class);
+        commandLine.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin);
         commandLine.setOut(new PrintWriter(output.out))
                     .setErr(new PrintWriter(output.err))
                     .setExecutionExceptionHandler((ex, cmdLine, parseResult) -> {
-                        output.err.println(ex.getMessage());
-                        commandLine.usage(output.err);
+                        ex.printStackTrace(cmdLine.getErr());
                         return 1;
                     });
 
@@ -256,7 +262,7 @@ public class NodeToolV2
 
             // This must be after all the subcommands are added to the commandLine.
             commandLine.setHelpFactory(CassandraHelpLayout::new);
-            commandLine.getSubcommands().values().forEach(sub -> sub.addMixin(JmxConnect.MIXIN_KEY, new JmxConnect()));
+            commandLine.getSubcommands().values().forEach(sub -> sub.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin));
             commandLine.setUsageHelpWidth(CassandraHelpLayout.DEFAULT_USAGE_HELP_WIDTH);
             commandLine.setHelpSectionKeys(CassandraHelpLayout.cassandraHelpSectionKeys());
         }
@@ -305,7 +311,7 @@ public class NodeToolV2
         {
 //            NodeToolCmdRunnable parse = parser.parse(args);
             printHistory(args);
-            commandLine.execute(args);
+            status = commandLine.execute(args);
 //            parse.run(nodeProbeFactory, output);
         } catch (IllegalArgumentException |
                 IllegalStateException |
@@ -328,15 +334,47 @@ public class NodeToolV2
         return status;
     }
 
-    private static Object instantiateCommand(Class<? extends BaseCommand> commandClass)
+    private static <T> T create(CommandLine.IFactory factory, Class<T> clazz)
     {
         try
         {
-            return commandClass.getDeclaredConstructor().newInstance();
+            return factory.create(clazz);
         }
         catch (Exception e)
         {
-            throw new RuntimeException("Failed to instantiate command " + commandClass.getName(), e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static class CassandraCliFactory implements CommandLine.IFactory
+    {
+        private final CommandLine.IFactory fallback;
+        private final INodeProbeFactory nodeProbeFactory;
+        private final Output output;
+
+
+        public CassandraCliFactory(INodeProbeFactory nodeProbeFactory, Output output)
+        {
+            this.fallback = CommandLine.defaultFactory();
+            this.nodeProbeFactory = nodeProbeFactory;
+            this.output = output;
+        }
+
+        public <K> K create(Class<K> cls) throws Exception
+        {
+            Object bean = this.fallback.create(cls);
+            Field[] fields = bean.getClass().getDeclaredFields();
+            for (Field field : fields)
+            {
+                if (!field.isAnnotationPresent(Inject.class))
+                    continue;
+                field.setAccessible(true);
+                if (field.getType().equals(INodeProbeFactory.class))
+                    field.set(bean, nodeProbeFactory);
+                else if (field.getType().equals(Output.class))
+                    field.set(bean, Output.CONSOLE);
+            }
+            return (K) bean;
         }
     }
 

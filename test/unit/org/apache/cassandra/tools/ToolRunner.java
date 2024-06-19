@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.NodeToolResult;
+import org.apache.cassandra.tools.nodetool.CompactTest;
 import org.apache.cassandra.utils.Pair;
 import org.assertj.core.util.Lists;
 
@@ -191,6 +193,11 @@ public class ToolRunner
         return invoke(CQLTester.buildNodetoolArgs(args));
     }
 
+    public static ToolResult invokeNodetool(Map<String, String> env, String... args)
+    {
+        return invokeNodetool(env, Arrays.asList(args));
+    }
+
     public static ToolResult invokeNodetool(Map<String, String> env, List<String> args)
     {
         return invoke(env, CQLTester.buildNodetoolArgs(args));
@@ -308,6 +315,29 @@ public class ToolRunner
                               res.right.getStdout() + res.left.getStdout(),
                               res.right.getStderr() + res.left.getStderr(),
                               res.right.getException());
+    }
+
+    public static ToolRunner.ToolResult invokeNodetoolInJvm(BiFunction<INodeProbeFactory, Output, Object> factory, String... commands)
+    {
+        NodeToolSynopsisTest.ListOutputStream out = new NodeToolSynopsisTest.ListOutputStream();
+        NodeToolSynopsisTest.ListOutputStream err = new NodeToolSynopsisTest.ListOutputStream();
+        List<String> args = CQLTester.buildNodetoolArgs(List.of(commands));
+        args.remove("bin/nodetool");
+        try
+        {
+            Object runner = factory.apply(new NodeProbeFactory(), new Output(new PrintStream(out), new PrintStream(err)));
+            Object result = runner.getClass().getMethod("execute", String[].class)
+                                  .invoke(runner, new Object[] { args.toArray(new String[0]) });
+            assertTrue(result instanceof Integer);
+
+            return new ToolResult(args, (Integer) result, String.join("\n", out.getOutputLines()),
+                                  String.join("\n", err.getOutputLines()), null);
+        }
+        catch (Exception e)
+        {
+            return new ToolResult(args, -1, String.join("\n", out.getOutputLines()),
+                                  String.join("\n", err.getOutputLines()), e);
+        }
     }
 
     public static <T> Pair<T, ToolResult> invokeSupplier(Supplier<T> runMe)

@@ -18,11 +18,11 @@
 package org.apache.cassandra.management.api;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.ManagementContext;
-import org.apache.cassandra.service.StorageServiceMBean;
+import org.apache.cassandra.management.ServiceBridge;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 
@@ -36,12 +36,12 @@ public class AbortBootstrap extends BaseCommand
     private String endpoint = EMPTY;
 
     @Override
-    public void execute(ManagementContext probe)
+    public void execute(ServiceBridge probe)
     {
         if (isEmpty(nodeId) && isEmpty(endpoint))
             throw new IllegalArgumentException("Either --node or --ip needs to be set");
         if (!isEmpty(nodeId) && !isEmpty(endpoint))
             throw new IllegalArgumentException("Only one of --node or --ip need to be set");
-        probe.getManagementService(StorageServiceMBean.class).abortBootstrap(nodeId, endpoint);
+        ssProxy(probe).abortBootstrap(nodeId, endpoint);
     }
 }

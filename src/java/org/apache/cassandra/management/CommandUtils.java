@@ -18,8 +18,21 @@
 
 package org.apache.cassandra.management;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+
+import org.apache.cassandra.db.compaction.CompactionManagerMBean;
+import org.apache.cassandra.service.StorageServiceMBean;
+import org.apache.cassandra.tools.NodeProbe;
+import org.apache.cassandra.tools.NodeTool;
+
+import static com.google.common.collect.Iterables.toArray;
+import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
 public final class CommandUtils
 {
@@ -46,13 +59,13 @@ public final class CommandUtils
         return result;
     }
 
-    public static boolean empty(String str)
+    public static StorageServiceMBean ssProxy(ServiceBridge bridge)
     {
-        return str == null || str.trim().isEmpty();
+        return bridge.mBean(StorageServiceMBean.class);
     }
 
-    private static boolean empty(Object[] array)
+    public static CompactionManagerMBean cmProxy(ServiceBridge bridge)
     {
-        return array == null || array.length == 0;
+        return bridge.mBean(CompactionManagerMBean.class);
     }
 }

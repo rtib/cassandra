@@ -18,10 +18,10 @@
 package org.apache.cassandra.management.api;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.ManagementContext;
-import org.apache.cassandra.service.StorageServiceMBean;
+import org.apache.cassandra.management.ServiceBridge;
 import picocli.CommandLine;
 
+import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
 @CommandLine.Command(name = "assassinate", description = "Forcefully remove a dead node without re-replicating any data. Use as a last resort if you cannot removenode")
@@ -31,8 +31,8 @@ public class Assassinate extends BaseCommand
     private String ip_address = EMPTY;
 
     @Override
-    public void execute(ManagementContext probe)
+    public void execute(ServiceBridge probe)
     {
-        probe.getManagementService(StorageServiceMBean.class).assassinateEndpoint(ip_address);
+        ssProxy(probe).assassinateEndpoint(ip_address);
     }
 }

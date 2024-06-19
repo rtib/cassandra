@@ -17,20 +17,7 @@
  */
 package org.apache.cassandra.tools;
 
-import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.google.common.collect.Iterables.toArray;
-import static com.google.common.collect.Lists.newArrayList;
-import static java.lang.Integer.parseInt;
-import static java.lang.String.format;
-import static org.apache.cassandra.io.util.File.WriteMode.APPEND;
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
-import static org.apache.commons.lang3.StringUtils.EMPTY;
-import static org.apache.commons.lang3.StringUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
-
 import java.io.Console;
-import org.apache.cassandra.io.util.File;
-import org.apache.cassandra.io.util.FileWriter;
 import java.io.FileNotFoundException;
 import java.io.IOError;
 import java.io.IOException;
@@ -44,16 +31,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.SortedMap;
-
 import javax.management.InstanceNotFoundException;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
-
-import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
-import org.apache.cassandra.tools.nodetool.*;
-import org.apache.cassandra.utils.FBUtilities;
-
 import com.google.common.collect.Maps;
 
 import io.airlift.airline.Cli;
@@ -67,6 +48,24 @@ import io.airlift.airline.ParseCommandUnrecognizedException;
 import io.airlift.airline.ParseOptionConversionException;
 import io.airlift.airline.ParseOptionMissingException;
 import io.airlift.airline.ParseOptionMissingValueException;
+import org.apache.cassandra.io.util.File;
+import org.apache.cassandra.io.util.FileWriter;
+import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
+import org.apache.cassandra.management.ServiceBridge;
+import org.apache.cassandra.tools.nodetool.*;
+import org.apache.cassandra.utils.FBUtilities;
+
+import static com.google.common.base.Throwables.getStackTraceAsString;
+import static com.google.common.collect.Iterables.toArray;
+import static com.google.common.collect.Lists.newArrayList;
+import static java.lang.Integer.parseInt;
+import static java.lang.String.format;
+import static org.apache.cassandra.io.util.File.WriteMode.APPEND;
+import static org.apache.cassandra.management.CommandUtils.ssProxy;
+import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.EMPTY;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 public class NodeTool
 {
@@ -403,7 +402,7 @@ public class NodeTool
 
         }
 
-        private String readUserPasswordFromFile(String username, String passwordFilePath) {
+        public static String readUserPasswordFromFile(String username, String passwordFilePath) {
             String password = EMPTY;
 
             File passwordFile = new File(passwordFilePath);
@@ -431,7 +430,7 @@ public class NodeTool
             return password;
         }
 
-        private String promptAndReadPassword()
+        public static String promptAndReadPassword()
         {
             String password = EMPTY;
 
@@ -471,12 +470,12 @@ public class NodeTool
             ALL, NON_SYSTEM, NON_LOCAL_STRATEGY
         }
 
-        protected List<String> parseOptionalKeyspace(List<String> cmdArgs, NodeProbe nodeProbe)
+        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceBridge nodeProbe)
         {
             return parseOptionalKeyspace(cmdArgs, nodeProbe, KeyspaceSet.ALL);
         }
 
-        protected List<String> parseOptionalKeyspace(List<String> cmdArgs, NodeProbe nodeProbe, KeyspaceSet defaultKeyspaceSet)
+        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceBridge nodeProbe, KeyspaceSet defaultKeyspaceSet)
         {
             List<String> keyspaces = new ArrayList<>();
 
@@ -484,11 +483,11 @@ public class NodeTool
             if (cmdArgs == null || cmdArgs.isEmpty())
             {
                 if (defaultKeyspaceSet == KeyspaceSet.NON_LOCAL_STRATEGY)
-                    keyspaces.addAll(keyspaces = nodeProbe.getNonLocalStrategyKeyspaces());
+                    keyspaces.addAll(keyspaces = ssProxy(nodeProbe).getNonLocalStrategyKeyspaces());
                 else if (defaultKeyspaceSet == KeyspaceSet.NON_SYSTEM)
-                    keyspaces.addAll(keyspaces = nodeProbe.getNonSystemKeyspaces());
+                    keyspaces.addAll(keyspaces = ssProxy(nodeProbe).getNonSystemKeyspaces());
                 else
-                    keyspaces.addAll(nodeProbe.getKeyspaces());
+                    keyspaces.addAll(ssProxy(nodeProbe).getKeyspaces());
             }
             else
             {
@@ -497,19 +496,19 @@ public class NodeTool
 
             for (String keyspace : keyspaces)
             {
-                if (!nodeProbe.getKeyspaces().contains(keyspace))
+                if (!ssProxy(nodeProbe).getKeyspaces().contains(keyspace))
                     throw new IllegalArgumentException("Keyspace [" + keyspace + "] does not exist.");
             }
 
             return Collections.unmodifiableList(keyspaces);
         }
 
-        protected String[] parseOptionalTables(List<String> cmdArgs)
+        public static String[] parseOptionalTables(List<String> cmdArgs)
         {
             return cmdArgs.size() <= 1 ? EMPTY_STRING_ARRAY : toArray(cmdArgs.subList(1, cmdArgs.size()), String.class);
         }
 
-        protected String[] parsePartitionKeys(List<String> cmdArgs)
+        public static String[] parsePartitionKeys(List<String> cmdArgs)
         {
             return cmdArgs.size() <= 2 ? EMPTY_STRING_ARRAY : toArray(cmdArgs.subList(2, cmdArgs.size()), String.class);
         }
