@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import javax.management.JMX;
 import javax.management.MBeanServerConnection;
@@ -233,9 +234,14 @@ public class NodeProbe implements AutoCloseable, ServiceBridge
         this.output = Output.CONSOLE;
     }
 
-    private <T> T cacheProxy(T proxy)
+    private static <T> T cachedNewMBeanProxy(BiConsumer<String, Object> cache,
+                                             MBeanServerConnection connection,
+                                             ObjectName objectName,
+                                             Class<T> clazz)
     {
-        cachedMBeans.put(proxy.getClass().getName(), proxy);
+
+        T proxy = JMX.newMBeanProxy(connection, objectName, clazz);
+        cache.accept(clazz.getName(), proxy);
         return proxy;
     }
 
@@ -275,55 +281,49 @@ public class NodeProbe implements AutoCloseable, ServiceBridge
         try
         {
             ObjectName name = new ObjectName(ssObjName);
-            ssProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, StorageServiceMBean.class));
+            ssProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, StorageServiceMBean.class);
             name = new ObjectName(CMSOperations.MBEAN_OBJECT_NAME);
-            cmsProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, CMSOperationsMBean.class));
+            cmsProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CMSOperationsMBean.class);
             name = new ObjectName(MessagingService.MBEAN_NAME);
-            msProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, MessagingServiceMBean.class));
+            msProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, MessagingServiceMBean.class);
             name = new ObjectName(StreamManagerMBean.OBJECT_NAME);
-            streamProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, StreamManagerMBean.class));
+            streamProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, StreamManagerMBean.class);
             name = new ObjectName(CompactionManager.MBEAN_OBJECT_NAME);
-            compactionProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, CompactionManagerMBean.class));
+            compactionProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CompactionManagerMBean.class);
             name = new ObjectName(FailureDetector.MBEAN_NAME);
-            fdProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, FailureDetectorMBean.class));
+            fdProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, FailureDetectorMBean.class);
             name = new ObjectName(CacheService.MBEAN_NAME);
-            cacheService = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, CacheServiceMBean.class));
+            cacheService = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CacheServiceMBean.class);
             name = new ObjectName(StorageProxy.MBEAN_NAME);
-            spProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, StorageProxyMBean.class));
+            spProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, StorageProxyMBean.class);
             name = new ObjectName(HintsService.MBEAN_NAME);
-            hsProxy = cacheProxy(JMX.newMBeanProxy(mbeanServerConn, name, HintsServiceMBean.class));
+            hsProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, HintsServiceMBean.class);
             name = new ObjectName(GCInspector.MBEAN_NAME);
-            gcProxy = JMX.newMBeanProxy(mbeanServerConn, name, GCInspectorMXBean.class);
+            gcProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, GCInspectorMXBean.class);
             name = new ObjectName(Gossiper.MBEAN_NAME);
-            gossProxy = JMX.newMBeanProxy(mbeanServerConn, name, GossiperMBean.class);
+            gossProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, GossiperMBean.class);
             name = new ObjectName(BatchlogManager.MBEAN_NAME);
-            bmProxy = JMX.newMBeanProxy(mbeanServerConn, name, BatchlogManagerMBean.class);
+            bmProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, BatchlogManagerMBean.class);
             name = new ObjectName(ActiveRepairServiceMBean.MBEAN_NAME);
-            arsProxy = JMX.newMBeanProxy(mbeanServerConn, name, ActiveRepairServiceMBean.class);
+            arsProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, ActiveRepairServiceMBean.class);
             name = new ObjectName(AuditLogManager.MBEAN_NAME);
-            almProxy = JMX.newMBeanProxy(mbeanServerConn, name, AuditLogManagerMBean.class);
+            almProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, AuditLogManagerMBean.class);
             name = new ObjectName(AuthCache.MBEAN_NAME_BASE + PasswordAuthenticator.CredentialsCacheMBean.CACHE_NAME);
-            ccProxy = JMX.newMBeanProxy(mbeanServerConn, name, PasswordAuthenticator.CredentialsCacheMBean.class);
+            ccProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, PasswordAuthenticator.CredentialsCacheMBean.class);
             name = new ObjectName(AuthCache.MBEAN_NAME_BASE + AuthorizationProxy.JmxPermissionsCacheMBean.CACHE_NAME);
-            jpcProxy = JMX.newMBeanProxy(mbeanServerConn, name, AuthorizationProxy.JmxPermissionsCacheMBean.class);
-
+            jpcProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, AuthorizationProxy.JmxPermissionsCacheMBean.class);
             name = new ObjectName(AuthCache.MBEAN_NAME_BASE + NetworkPermissionsCache.CACHE_NAME);
-            npcProxy = JMX.newMBeanProxy(mbeanServerConn, name, NetworkPermissionsCacheMBean.class);
-
+            npcProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, NetworkPermissionsCacheMBean.class);
             name = new ObjectName(AuthCache.MBEAN_NAME_BASE + PermissionsCache.CACHE_NAME);
-            pcProxy = JMX.newMBeanProxy(mbeanServerConn, name, PermissionsCacheMBean.class);
-
+            pcProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, PermissionsCacheMBean.class);
             name = new ObjectName(AuthCache.MBEAN_NAME_BASE + RolesCache.CACHE_NAME);
-            rcProxy = JMX.newMBeanProxy(mbeanServerConn, name, RolesCacheMBean.class);
-
+            rcProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, RolesCacheMBean.class);
             name = new ObjectName(CIDRPermissionsManager.MBEAN_NAME);
-            cpbProxy = JMX.newMBeanProxy(mbeanServerConn, name, CIDRPermissionsManagerMBean.class);
-
+            cpbProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CIDRPermissionsManagerMBean.class);
             name = new ObjectName(CIDRGroupsMappingManager.MBEAN_NAME);
-            cmbProxy = JMX.newMBeanProxy(mbeanServerConn, name, CIDRGroupsMappingManagerMBean.class);
-
+            cmbProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CIDRGroupsMappingManagerMBean.class);
             name = new ObjectName(CIDRFilteringMetricsTable.MBEAN_NAME);
-            cfmProxy = JMX.newMBeanProxy(mbeanServerConn, name, CIDRFilteringMetricsTableMBean.class);
+            cfmProxy = cachedNewMBeanProxy(cachedMBeans::put, mbeanServerConn, name, CIDRFilteringMetricsTableMBean.class);
         }
         catch (MalformedObjectNameException e)
         {

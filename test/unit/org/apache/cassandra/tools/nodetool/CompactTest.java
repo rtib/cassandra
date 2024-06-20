@@ -22,17 +22,12 @@ import java.util.Arrays;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.Murmur3Partitioner;
-import org.apache.cassandra.tools.NodeToolV2;
-import org.apache.cassandra.tools.ToolRunner;
 import org.assertj.core.api.Assertions;
 
-import static org.apache.cassandra.tools.ToolRunner.invokeNodetool;
-
-public class CompactTest extends CQLTester
+public class CompactTest extends CQLToolRunnerTester
 {
     @BeforeClass
     public static void setup() throws Throwable
@@ -56,8 +51,7 @@ public class CompactTest extends CQLTester
             flush(keyspace());
         }
         Assertions.assertThat(cfs.getTracker().getView().liveSSTables()).hasSize(10);
-//        createMBeanServerConnection();
-        invokeNodeToolV2("compact", "--partition", Long.toString(key), keyspace(), currentTable()).assertOnCleanExit();
+        invokeNodetool("compact", "--partition", Long.toString(key), keyspace(), currentTable()).assertOnCleanExit();
 
         // only 1 SSTable should exist
         Assertions.assertThat(cfs.getTracker().getView().liveSSTables()).hasSize(1);
@@ -106,10 +100,5 @@ public class CompactTest extends CQLTester
         .asserts()
         .failure()
         .errorContains(String.format("Unable to parse partition key 'this_will_not_work' for table %s.%s; Unable to make long from 'this_will_not_work'", keyspace(), currentTable()));
-    }
-
-    public static ToolRunner.ToolResult invokeNodeToolV2(String... commands)
-    {
-        return ToolRunner.invokeNodetoolInJvm(NodeToolV2::new, commands);
     }
 }

@@ -152,5 +152,11 @@ public class NodeToolSynopsisTest
             flush();
             return new ArrayList<>(outputLines);
         }
+
+        public String getOutput()
+        {
+            flush();
+            return String.join(System.lineSeparator(), outputLines);
+        }
     }
 }

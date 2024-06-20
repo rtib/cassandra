@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.SortedMap;
+import java.util.function.Consumer;
 import javax.management.InstanceNotFoundException;
 
 import com.google.common.base.Joiner;
@@ -295,7 +296,7 @@ public class NodeTool
         return status;
     }
 
-    private static void printHistory(String... args)
+    public static void printHistory(String... args)
     {
         //don't bother to print if no args passed (meaning, nodetool is just printing out the sub-commands list)
         if (args.length == 0)
@@ -315,21 +316,31 @@ public class NodeTool
         }
     }
 
-    protected void badUse(Exception e)
+    public static void badUse(Consumer<String> out, Throwable e)
     {
-        output.out.println("nodetool: " + e.getMessage());
-        output.out.println("See 'nodetool help' or 'nodetool help <command>'.");
+        out.accept("nodetool: " + e.getMessage());
+        out.accept("See 'nodetool help' or 'nodetool help <command>'.");
     }
 
-    protected void err(Throwable e)
+    protected void badUse(Exception e)
+    {
+        badUse(output.out::println, e);
+    }
+
+    public static void err(Consumer<String> out, Throwable e)
     {
         // CASSANDRA-11537: friendly error message when server is not ready
         if (e instanceof InstanceNotFoundException)
             throw new IllegalArgumentException("Server is not initialized yet, cannot run nodetool.");
 
-        output.err.println("error: " + e.getMessage());
-        output.err.println("-- StackTrace --");
-        output.err.println(getStackTraceAsString(e));
+        out.accept("error: " + e.getMessage());
+        out.accept("-- StackTrace --");
+        out.accept(getStackTraceAsString(e));
+    }
+
+    protected void err(Throwable e)
+    {
+        err(output.err::println, e);
     }
 
     public static class CassHelp extends Help implements NodeToolCmdRunnable

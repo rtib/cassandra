@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.NodeToolResult;
-import org.apache.cassandra.tools.nodetool.CompactTest;
 import org.apache.cassandra.utils.Pair;
 import org.assertj.core.util.Lists;
 
@@ -317,6 +316,16 @@ public class ToolRunner
                               res.right.getException());
     }
 
+    public static ToolResult invokeNodetoolInJvmV2(String... commands)
+    {
+        return ToolRunner.invokeNodetoolInJvm(NodeToolV2::new, commands);
+    }
+
+    public static ToolResult invokeNodetoolInJvmV1(String... commands)
+    {
+        return ToolRunner.invokeNodetoolInJvm(NodeTool::new, commands);
+    }
+
     public static ToolRunner.ToolResult invokeNodetoolInJvm(BiFunction<INodeProbeFactory, Output, Object> factory, String... commands)
     {
         NodeToolSynopsisTest.ListOutputStream out = new NodeToolSynopsisTest.ListOutputStream();
@@ -329,14 +338,12 @@ public class ToolRunner
             Object result = runner.getClass().getMethod("execute", String[].class)
                                   .invoke(runner, new Object[] { args.toArray(new String[0]) });
             assertTrue(result instanceof Integer);
-
-            return new ToolResult(args, (Integer) result, String.join("\n", out.getOutputLines()),
-                                  String.join("\n", err.getOutputLines()), null);
+            return new ToolResult(args, (Integer) result, out.getOutput(), err.getOutput(), null);
         }
         catch (Exception e)
         {
-            return new ToolResult(args, -1, String.join("\n", out.getOutputLines()),
-                                  String.join("\n", err.getOutputLines()), e);
+            return new ToolResult(args, -1, out.getOutput(),
+                                  err.getOutput() + '\n' + Throwables.getStackTraceAsString(e), e);
         }
     }
 

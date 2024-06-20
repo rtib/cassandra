@@ -22,8 +22,12 @@ import org.apache.cassandra.management.CassandraHelpCommand;
 import picocli.CommandLine;
 
 @CommandLine.Command(name = "nodetool",
-    subcommands = { CassandraHelpCommand.class },
-    description = "Manage your Cassandra cluster")
+    description = "Manage your Cassandra cluster",
+    subcommands = { CassandraHelpCommand.class,
+                    AbortBootstrap.class,
+                    Assassinate.class,
+                    ForceCompact.class,
+                    Compact.class })
 public class TopLevelCommand
 {
 }

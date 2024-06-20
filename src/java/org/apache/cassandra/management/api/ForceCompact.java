@@ -29,7 +29,7 @@ import picocli.CommandLine;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.cassandra.management.CommandUtils.ssProxy;
-import static org.apache.cassandra.tools.NodeToolV2.NodeToolCmd.parsePartitionKeys;
+import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.parsePartitionKeys;
 
 @CommandLine.Command(name = "forcecompact", description = "Force a (major) compaction on a table")
 public class ForceCompact extends BaseCommand
