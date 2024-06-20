@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -43,6 +44,13 @@ public abstract class CQLToolRunnerTester extends CQLTester
     public static Set<String> runners()
     {
         return runnersMap.keySet();
+    }
+
+    @BeforeClass
+    public static void setupNetwork() throws Throwable
+    {
+        requireNetwork();
+        startJMXServer();
     }
 
     protected ToolRunner.ToolResult invokeNodetool(String... args)

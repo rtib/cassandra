@@ -37,16 +37,16 @@ public class ForceCompact extends BaseCommand
     @CommandLine.Parameters(hidden = true, arity = "0", paramLabel = "[<keyspace> <table> <keys>]",
         description = { CommandUtils.CASSANDRA_BACKWARD_COMPATIBLE_MARKER,
                         "The keyspace, table, and a list of partition keys ignoring the gc_grace_seconds" })
-    private List<String> args;
+    public List<String> args;
 
     @CommandLine.Parameters(index = "0", arity = "1", description = "The keyspace name to compact")
-    private String keyspace;
+    public String keyspace;
 
     @CommandLine.Parameters(index = "1", arity = "1", description = "The table name to compact")
-    private String table;
+    public String table;
 
     @CommandLine.Parameters(index = "2..*", arity = "1", description = "The partition keys to compact")
-    private String[] keys;
+    public String[] keys;
 
     @Override
     public void execute(ServiceBridge probe)

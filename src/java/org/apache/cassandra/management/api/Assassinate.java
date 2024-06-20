@@ -28,7 +28,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 public class Assassinate extends BaseCommand
 {
     @CommandLine.Parameters(description = "IP address of the endpoint to assassinate", arity = "1")
-    private String ip_address = EMPTY;
+    public String ip_address = EMPTY;
 
     @Override
     public void execute(ServiceBridge probe)

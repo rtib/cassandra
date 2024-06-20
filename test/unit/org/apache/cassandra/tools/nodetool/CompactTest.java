@@ -19,7 +19,6 @@ package org.apache.cassandra.tools.nodetool;
 
 import java.util.Arrays;
 
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -29,13 +28,6 @@ import org.assertj.core.api.Assertions;
 
 public class CompactTest extends CQLToolRunnerTester
 {
-    @BeforeClass
-    public static void setup() throws Throwable
-    {
-        requireNetwork();
-        startJMXServer();
-    }
-
     @Test
     public void keyPresent() throws Throwable
     {

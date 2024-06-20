@@ -21,6 +21,8 @@ package org.apache.cassandra.management.api;
 import org.apache.cassandra.management.CassandraHelpCommand;
 import picocli.CommandLine;
 
+import static org.apache.cassandra.management.CassandraHelpCommand.printTopCommandUsage;
+
 @CommandLine.Command(name = "nodetool",
     description = "Manage your Cassandra cluster",
     subcommands = { CassandraHelpCommand.class,
@@ -28,6 +30,15 @@ import picocli.CommandLine;
                     Assassinate.class,
                     ForceCompact.class,
                     Compact.class })
-public class TopLevelCommand
+public class TopLevelCommand implements Runnable
 {
+    @CommandLine.Spec
+    public CommandLine.Model.CommandSpec spec;
+
+    public void run()
+    {
+        printTopCommandUsage(spec.commandLine(),
+                             spec.commandLine().getColorScheme(),
+                             spec.commandLine().getOut());
+    }
 }

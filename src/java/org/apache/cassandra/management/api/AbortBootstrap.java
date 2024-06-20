@@ -30,10 +30,10 @@ import static org.apache.commons.lang3.StringUtils.isEmpty;
 public class AbortBootstrap extends BaseCommand
 {
     @Option(names = "--node", description = "Node ID of the node that failed bootstrap")
-    private String nodeId = EMPTY;
+    public String nodeId = EMPTY;
 
     @Option(names = "--ip", description = "IP of the node that failed bootstrap")
-    private String endpoint = EMPTY;
+    public String endpoint = EMPTY;
 
     @Override
     public void execute(ServiceBridge probe)

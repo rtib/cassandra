@@ -134,27 +134,4 @@ public class NodeToolV2
             return (K) bean;
         }
     }
-
-//    public static SortedMap<String, SetHostStatWithPort> getOwnershipByDcWithPort(NodeProbe probe, boolean resolveIp,
-//                                                                  Map<String, String> tokenToEndpoint,
-//                                                                  Map<String, Float> ownerships)
-//    {
-//        SortedMap<String, SetHostStatWithPort> ownershipByDc = Maps.newTreeMap();
-//        EndpointSnitchInfoMBean epSnitchInfo = probe.getEndpointSnitchInfoProxy();
-//        try
-//        {
-//            for (Entry<String, String> tokenAndEndPoint : tokenToEndpoint.entrySet())
-//            {
-//                String dc = epSnitchInfo.getDatacenter(tokenAndEndPoint.getValue());
-//                if (!ownershipByDc.containsKey(dc))
-//                    ownershipByDc.put(dc, new SetHostStatWithPort(resolveIp));
-//                ownershipByDc.get(dc).add(tokenAndEndPoint.getKey(), tokenAndEndPoint.getValue(), ownerships);
-//            }
-//        }
-//        catch (UnknownHostException e)
-//        {
-//            throw new RuntimeException(e);
-//        }
-//        return ownershipByDc;
-//    }
 }

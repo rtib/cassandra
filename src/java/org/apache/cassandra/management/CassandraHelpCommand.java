@@ -78,7 +78,7 @@ public class CassandraHelpCommand implements CommandLine.IHelpCommandInitializab
         subcommand.usage(out, colors);
     }
 
-    private static void printTopCommandUsage(CommandLine command, CommandLine.Help.ColorScheme colors, PrintWriter writer)
+    public static void printTopCommandUsage(CommandLine command, CommandLine.Help.ColorScheme colors, PrintWriter writer)
     {
         if (command == null)
             return;

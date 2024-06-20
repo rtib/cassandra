@@ -346,6 +346,21 @@ public class CassandraHelpLayout extends CommandLine.Help
         return createHeading("%n", params);
     }
 
+    @Override
+    public String footer(Object... params)
+    {
+
+        String[] footer = isEmpty(
+            commandSpec().usageMessage().footer()) ? new String[]{ "See 'nodetool help <command>' for more information on a specific command." } :
+                          commandSpec().usageMessage().footer();
+        return join(ansi(),
+                    commandSpec().usageMessage().width(),
+                    commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters(),
+                    footer,
+                    new StringBuilder(),
+                    params).toString();
+    }
+
     public String topLevelCommandListHeading(Object... params) {
         return createHeading(TOP_LEVEL_COMMAND_HEADING, params);
     }
@@ -448,9 +463,9 @@ public class CassandraHelpLayout extends CommandLine.Help
             Ansi.Text desc = scheme.optionText(option.description().length == 0 ? "" : option.description()[0]);
 
             Ansi.Text[][] result = new Ansi.Text[3][];
-            result[0] = new Ansi.Text[]{optionText};
-            result[1] = new Ansi.Text[]{descPadding.concat(desc)};
-            result[2] = new Ansi.Text[]{Ansi.OFF.new Text("", scheme)};
+            result[0] = new Ansi.Text[]{ optionText };
+            result[1] = new Ansi.Text[]{ descPadding.concat(desc) };
+            result[2] = new Ansi.Text[]{ Ansi.OFF.new Text("", scheme) };
             return result;
         }
     }
@@ -466,7 +481,7 @@ public class CassandraHelpLayout extends CommandLine.Help
             Ansi.Text descPadding = Ansi.OFF.new Text(leadingSpaces(DESCRIPTION_INDENT), scheme);
             Ansi.Text[][] result = new Ansi.Text[3][];
             result[0] = new Ansi.Text[]{ parameterLabelRenderer.renderParameterLabel(param, scheme.ansi(), scheme.parameterStyles()) };
-            result[1] = new Ansi.Text[]{ descPadding.concat(scheme.text(descriptionString)) };
+            result[1] = new Ansi.Text[]{ descPadding.concat(scheme.parameterText(descriptionString)) };
             result[2] = new Ansi.Text[]{ Ansi.OFF.new Text("", scheme) };
             return result;
         }

@@ -20,7 +20,6 @@ package org.apache.cassandra.management.api;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.cassandra.db.compaction.CompactionManagerMBean;
 import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.ServiceBridge;
 import picocli.CommandLine;
@@ -34,24 +33,24 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 @CommandLine.Command(name = "compact", description = "Force a (major) compaction on one or more tables or user-defined compaction on given SSTables")
 public class Compact extends BaseCommand
 {
-    @CommandLine.Parameters(paramLabel = "[<keyspace> <tables>...] or <SSTable file>...", arity = "0..*",
+    @CommandLine.Parameters(paramLabel = "[<keyspace> <tables>...] or <SSTable file>...",
         description = "The keyspace followed by one or many tables or list of SSTable data files when using --user-defined")
-    private List<String> args = new ArrayList<>();
+    public List<String> args = new ArrayList<>();
 
     @CommandLine.Option(names = { "-s", "--split-output"}, description = "Use -s to not create a single big file")
-    private boolean splitOutput = false;
+    public boolean splitOutput = false;
 
     @CommandLine.Option(names = { "--user-defined"}, description = "Use --user-defined to submit listed files for user-defined compaction")
-    private boolean userDefined = false;
+    public boolean userDefined = false;
 
     @CommandLine.Option(names = { "-st", "--start-token"}, description = "Use -st to specify a token at which the compaction range starts (inclusive)")
-    private String startToken = EMPTY;
+    public String startToken = EMPTY;
 
     @CommandLine.Option(names = { "-et", "--end-token"}, description = "Use -et to specify a token at which compaction range ends (inclusive)")
-    private String endToken = EMPTY;
+    public String endToken = EMPTY;
 
     @CommandLine.Option(names = { "--partition"}, description = "String representation of the partition key")
-    private String partitionKey = EMPTY;
+    public String partitionKey = EMPTY;
 
     @Override
     public void execute(ServiceBridge probe)
