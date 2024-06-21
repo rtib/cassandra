@@ -79,7 +79,8 @@ public class JmxConnectionMixin
         int start = indexOfLastSubcommandWithSameParent(parsedCommands);
         CommandLine.Model.CommandSpec lastParent = parsedCommands.get(start).getCommandSpec();
         CommandLine.Model.CommandSpec jmx = lastParent.mixins().get(MIXIN_KEY);
-        Preconditions.checkNotNull(jmx, "No JmxConnect mixin found in the command hierarchy");
+        if (jmx == null)
+            throw new CommandLine.InitializationException("No JmxConnect mixin found in the command hierarchy");
 
         if (lastParent.userObject() instanceof BaseCommand)
             ((BaseCommand) lastParent.userObject()).setBridge(((JmxConnectionMixin) jmx.userObject()).init(lastParent));

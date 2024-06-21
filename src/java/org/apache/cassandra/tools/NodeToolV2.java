@@ -96,7 +96,7 @@ public class NodeToolV2
 
     private static void configureCliLayout(CommandLine commandLine)
     {
-        if (CassandraRelevantProperties.CASSANDRA_CLI_DEFAULT_LAYOUT.getBoolean())
+        if (CassandraRelevantProperties.CASSANDRA_CLI_PICOCLI_LAYOUT.getBoolean())
             return;
 
         commandLine.setHelpFactory(CassandraHelpLayout::new)
