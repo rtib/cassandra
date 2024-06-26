@@ -19,7 +19,6 @@
 package org.apache.cassandra.management.api;
 
 import java.io.IOException;
-import java.util.List;
 import javax.inject.Inject;
 
 import com.google.common.base.Throwables;

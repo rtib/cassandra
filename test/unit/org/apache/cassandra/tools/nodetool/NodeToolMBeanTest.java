@@ -21,113 +21,114 @@ package org.apache.cassandra.tools.nodetool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-import javax.management.QueryExp;
+import javax.management.StandardMBean;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
-import org.apache.cassandra.config.CassandraRelevantProperties;
+import org.apache.cassandra.db.compaction.CompactionManagerMBean;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.service.StorageServiceMBean;
 import org.apache.cassandra.utils.MBeanWrapper;
 import org.mockito.Mockito;
 
-import static org.apache.cassandra.config.CassandraRelevantProperties.MBEAN_REGISTRATION_CLASS;
 import static org.mockito.Mockito.when;
 
 public class NodeToolMBeanTest extends CQLToolRunnerTester
 {
-    private static MBeanMockInstance mbeanMockInstance;
+    public static final String STORAGE_SERVICE_MBEAN = "org.apache.cassandra.db:type=StorageService";
+    public static final String COMPACTION_MANAGER_MBEAN = "org.apache.cassandra.db:type=CompactionManager";
+    private static final MBeanWrapper mbeanServer = MBeanWrapper.instance;
+    private MBeanMockHodler mbeanMockHodler;
 
-    @BeforeClass
-    public static void setUpClass()
+    @Before
+    public void prepareMocks()
     {
-        CassandraRelevantProperties.DTEST_IS_IN_JVM_DTEST.setBoolean(true);
-        MBEAN_REGISTRATION_CLASS.setString(MBeanMockInstance.class.getName());
-        mbeanMockInstance = (MBeanMockInstance) ((MBeanWrapper.DelegatingMbeanWrapper) MBeanWrapper.instance).getDelegate();
-        CQLToolRunnerTester.setUpClass();
+        mbeanMockHodler = new MBeanMockHodler();
+        mbeanMockHodler.unregisterAll(mbeanServer);
+        mbeanMockHodler.registerAll(mbeanServer);
     }
 
-    @AfterClass
-    public static void resetMBeanWrapper()
+    @After
+    public void unregisterMocks()
     {
-        CassandraRelevantProperties.DTEST_IS_IN_JVM_DTEST.setBoolean(false);
+        mbeanMockHodler.unregisterAll(mbeanServer);
     }
 
     @Test
-    public void keyPresent() throws Throwable
+    public void testAssassinate() throws Throwable
+    {
+        String ip = "10.20.113.11";
+        StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
+        when(mock.getNonSystemKeyspaces()).thenReturn(List.of(keyspace()));
+        invokeNodetool("assassinate", ip).assertOnCleanExit();
+        Mockito.verify(mock).assassinateEndpoint(ip);
+    }
+
+    @Test
+    public void testAbortBootstrap() throws Throwable
+    {
+        String nodeId = "1";
+        String ip = "10.20.113.11";
+        StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
+        invokeNodetool("abortbootstrap", "--node", nodeId).assertOnCleanExit();
+        Mockito.verify(mock).abortBootstrap(nodeId, "");
+        invokeNodetool("abortbootstrap", "--ip", ip).assertOnCleanExit();
+        Mockito.verify(mock).abortBootstrap("", ip);
+    }
+
+    @Test
+    public void testForceKeyspaceCompactionForPartitionKey() throws Throwable
     {
         long token = 42;
         long key = Murmur3Partitioner.LongToken.keyForToken(token).getLong();
         String table = "table";
-        StorageServiceMBean mock = getMock(mbeanMockInstance, StorageServiceMBean.class);
+        StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
         when(mock.getKeyspaces()).thenReturn(List.of(keyspace()));
         when(mock.getNonSystemKeyspaces()).thenReturn(List.of(keyspace()));
-
         invokeNodetool("compact", "--partition", Long.toString(key), keyspace(), table).assertOnCleanExit();
         Mockito.verify(mock).forceKeyspaceCompactionForPartitionKey(keyspace(), Long.toString(key), table);
     }
 
-    private static <T> T getMock(MBeanMockInstance mbeanMockInstance, Class<T> clz)
+    private static class MBeanMockHodler
     {
-        return clz.cast(mbeanMockInstance.mocks.get(clz));
-    }
+        private static final Map<String, Class<?>> mbeans = Map.of(
+            STORAGE_SERVICE_MBEAN, StorageServiceMBean.class,
+            COMPACTION_MANAGER_MBEAN, CompactionManagerMBean.class);
+        private final Map<String, StandardMBean> mocks = new HashMap<>();
 
-    public static class MBeanMockInstance implements MBeanWrapper
-    {
-        private final Map<ObjectName, Object> mbeans = new HashMap<>();
-        private final Map<Class<?>, Object> mocks = new HashMap<>();
-        private final PlatformMBeanWrapper wrapper = new PlatformMBeanWrapper();
-
-        public MBeanMockInstance()
+        MBeanMockHodler()
         {
+            mbeans.forEach((name, clz) -> mocks.put(name, newMock(clz)));
         }
 
-        @Override
-        public void registerMBean(Object obj, ObjectName mbeanName, OnException onException)
+        public static <T> StandardMBean newMock(Class<T> clz)
         {
-            Class<?> clz = obj.getClass();
-            Object mock = obj;
-            if (mbeanName.toString().equals("org.apache.cassandra.db:type=StorageService"))
+            try
             {
-                mbeans.put(mbeanName, mock = Mockito.mock(clz));
-                mocks.put(StorageServiceMBean.class, mock);
+                return new StandardMBean(Mockito.mock(clz), clz);
             }
-
-            wrapper.registerMBean(mock, mbeanName, onException);
+            catch (Exception e)
+            {
+                throw new RuntimeException(e);
+            }
         }
 
-        @Override
-        public boolean isRegistered(ObjectName mbeanName, OnException onException)
+        @SuppressWarnings("unchecked")
+        public <T> T getMock(String mBeanName)
         {
-            if (mbeans.containsKey(mbeanName))
-                return true;
-            return wrapper.isRegistered(mbeanName, onException);
+            return (T) mocks.get(mBeanName).getImplementation();
         }
 
-        @Override
-        public void unregisterMBean(ObjectName mbeanName, OnException onException)
+        public void registerAll(MBeanWrapper mbeanMockInstance)
         {
-            if (mbeans.containsKey(mbeanName))
-                mbeans.remove(mbeanName);
-            else
-                wrapper.unregisterMBean(mbeanName, onException);
+            mocks.forEach((name, mock) -> mbeanMockInstance.registerMBean(mock, name));
         }
 
-        @Override
-        public Set<ObjectName> queryNames(ObjectName name, QueryExp query)
+        public void unregisterAll(MBeanWrapper mbeanMockInstance)
         {
-            return wrapper.queryNames(name, query);
-        }
-
-        @Override
-        public MBeanServer getMBeanServer()
-        {
-            return wrapper.getMBeanServer();
+            mocks.keySet().forEach(name -> mbeanMockInstance.unregisterMBean(name, MBeanWrapper.OnException.IGNORE));
         }
     }
 }
