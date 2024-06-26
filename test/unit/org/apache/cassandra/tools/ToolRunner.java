@@ -39,7 +39,6 @@ import java.util.stream.Stream;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +48,7 @@ import org.apache.cassandra.distributed.api.NodeToolResult;
 import org.apache.cassandra.utils.Pair;
 import org.assertj.core.util.Lists;
 
+import static com.github.jknack.handlebars.internal.lang3.ArrayUtils.isEmpty;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -316,21 +316,11 @@ public class ToolRunner
                               res.right.getException());
     }
 
-    public static ToolResult invokeNodetoolInJvmV2(String... commands)
-    {
-        return ToolRunner.invokeNodetoolInJvm(NodeToolV2::new, commands);
-    }
-
-    public static ToolResult invokeNodetoolInJvmV1(String... commands)
-    {
-        return ToolRunner.invokeNodetoolInJvm(NodeTool::new, commands);
-    }
-
     public static ToolRunner.ToolResult invokeNodetoolInJvm(BiFunction<INodeProbeFactory, Output, Object> factory, String... commands)
     {
-        NodeToolSynopsisTest.ListOutputStream out = new NodeToolSynopsisTest.ListOutputStream();
-        NodeToolSynopsisTest.ListOutputStream err = new NodeToolSynopsisTest.ListOutputStream();
-        List<String> args = CQLTester.buildNodetoolArgs(List.of(commands));
+        ListOutputStream out = new ListOutputStream();
+        ListOutputStream err = new ListOutputStream();
+        List<String> args = CQLTester.buildNodetoolArgs(isEmpty(commands) ? new ArrayList<>() : List.of(commands));
         args.remove("bin/nodetool");
         try
         {
@@ -779,6 +769,40 @@ public class ToolRunner
         public ToolResult invoke()
         {
             return ToolRunner.invoke(env, stdin, args);
+        }
+    }
+
+    private static class ListOutputStream extends OutputStream
+    {
+        private final List<String> outputLines = new ArrayList<>();
+        private final StringBuilder buffer = new StringBuilder();
+
+        @Override
+        public void write(int b)
+        {
+            char c = (char) b;
+            if (c == '\n')
+            {
+                // Add the buffer to the list if it's a new line
+                outputLines.add(buffer.toString());
+                buffer.setLength(0); // Clear the buffer
+            }
+            else
+                buffer.append(c);
+        }
+
+        public void flush()
+        {
+            if (buffer.length() > 0)
+            {
+                outputLines.add(buffer.toString());
+                buffer.setLength(0);
+            }
+        }
+
+        public String getOutput()
+        {
+            return String.join("\n", outputLines);
         }
     }
 }

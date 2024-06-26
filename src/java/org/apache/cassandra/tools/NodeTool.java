@@ -31,11 +31,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import javax.management.InstanceNotFoundException;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 import io.airlift.airline.Cli;
@@ -49,18 +51,28 @@ import io.airlift.airline.ParseCommandUnrecognizedException;
 import io.airlift.airline.ParseOptionConversionException;
 import io.airlift.airline.ParseOptionMissingException;
 import io.airlift.airline.ParseOptionMissingValueException;
+import io.airlift.airline.UsageHelper;
+import io.airlift.airline.UsagePrinter;
+import io.airlift.airline.model.CommandGroupMetadata;
+import io.airlift.airline.model.CommandMetadata;
+import io.airlift.airline.model.GlobalMetadata;
 import org.apache.cassandra.io.util.File;
 import org.apache.cassandra.io.util.FileWriter;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
+import org.apache.cassandra.management.CassandraHelpLayout;
 import org.apache.cassandra.management.ServiceBridge;
 import org.apache.cassandra.tools.nodetool.*;
 import org.apache.cassandra.utils.FBUtilities;
+import picocli.CommandLine;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Throwables.getStackTraceAsString;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.toArray;
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
+import static java.util.stream.Collectors.toList;
 import static org.apache.cassandra.io.util.File.WriteMode.APPEND;
 import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
@@ -75,6 +87,7 @@ public class NodeTool
         FBUtilities.preventIllegalAccessWarnings();
     }
 
+    private static final int FALLBACK_NODETOOL_V1 = -100;
     private static final String HISTORYFILE = "nodetool.history";
 
     private final INodeProbeFactory nodeProbeFactory;
@@ -101,7 +114,7 @@ public class NodeTool
                 Cleanup.class,
                 ClearSnapshot.class,
                 ClientStats.class,
-                Compact.class,
+//                Compact.class,
                 CompactionHistory.class,
                 CompactionStats.class,
                 DataPaths.class,
@@ -272,9 +285,28 @@ public class NodeTool
         int status = 0;
         try
         {
-            NodeToolCmdRunnable parse = parser.parse(args);
-            printHistory(args);
-            parse.run(nodeProbeFactory, output);
+            // Try to run the command with the new parser, if it у fails, fallback to the old parser.
+            int result = new NodeToolV2(nodeProbeFactory, output)
+                             // Filter out the help command, and nodetool command, and fallback to the old help message.
+                             .withCommandNameFilter(cmd -> cmd.equals("help") || cmd.equals("nodetool"), FALLBACK_NODETOOL_V1)
+                             .withParameterExceptionHandler((ex, arg) -> {
+                                 if (ex instanceof CommandLine.UnmatchedArgumentException)
+                                     return FALLBACK_NODETOOL_V1;
+                                 badUse(ex);
+                                 return 1;
+                             })
+                             .withExecutionExceptionHandler((ex, c, arg) -> {
+                                 err(ex);
+                                 return 2;
+                             }).execute(args);
+
+            if (result >= 0)
+                return result;
+
+            // Fallback to the old parser, and run the command.
+            assert result == FALLBACK_NODETOOL_V1;
+            NodeToolCmdRunnable cmd = parser.parse(args);
+            cmd.run(nodeProbeFactory, output);
         } catch (IllegalArgumentException |
                 IllegalStateException |
                 ParseArgumentsMissingException |
@@ -348,8 +380,60 @@ public class NodeTool
         public void run(INodeProbeFactory nodeProbeFactory, Output output)
         {
             StringBuilder sb = new StringBuilder();
-            help(global, command, sb);
+            NodeToolV2 cmd = new NodeToolV2(nodeProbeFactory, output);
+            if (command.isEmpty())
+            {
+                usage(global, cmd.getCommandsDescription(), sb);
+            }
+            else
+            {
+                if (cmd.isCommandPresent(command.get(0)))
+                    cmd.execute("help", command.get(0));
+                else
+                    help(global, command, sb);
+            }
+
             output.out.println(sb);
+        }
+
+        public static void usage(GlobalMetadata global, Map<String, String> extraCommands, StringBuilder sb)
+        {
+            UsagePrinter out = new UsagePrinter(sb, CassandraHelpLayout.DEFAULT_USAGE_HELP_WIDTH);
+            List<String> commandArguments = global.getOptions().stream()
+                                                  .filter(option -> !option.isHidden())
+                                                  .map(UsageHelper::toUsage)
+                                                  .collect(toImmutableList());
+
+            out.newPrinterWithHangingIndent(CassandraHelpLayout.COLUMN_INDENT)
+               .append(CassandraHelpLayout.TOP_LEVEL_SYNOPSIS_LIST_PREFIX)
+               .append(global.getName())
+               .appendWords(commandArguments)
+               .append(CassandraHelpLayout.SYNOPSIS_SUBCOMMANDS_LABEL)
+               .newline()
+               .newline();
+
+            Map<String, String> commands = getCommandsDescription(global);
+            // Remove the help command from the list of extra commands if exists, as it's not applicable for backward compatibility.
+            extraCommands.remove("help");
+            commands.putAll(extraCommands);
+
+            out.append(CassandraHelpLayout.TOP_LEVEL_COMMAND_HEADING).newline();
+            out.newIndentedPrinter(CassandraHelpLayout.SUBCOMMANDS_INDENT)
+               .appendTable(commands.entrySet().stream()
+                                    .map(entry -> ImmutableList.of(entry.getKey(), firstNonNull(entry.getValue(), "")))
+                                    .collect(toList()));
+            out.newline();
+            out.append(CassandraHelpLayout.USAGE_HELP_FOOTER);
+        }
+
+        private static Map<String, String> getCommandsDescription(GlobalMetadata global)
+        {
+            Map<String, String> commands = new TreeMap<>();
+            for (CommandMetadata meta : global.getDefaultGroupCommands())
+                commands.put(meta.getName(), meta.getDescription());
+            for (CommandGroupMetadata grp : global.getCommandGroups())
+                commands.put(grp.getName(), grp.getDescription());
+            return commands;
         }
     }
 

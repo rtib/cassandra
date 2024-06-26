@@ -60,9 +60,9 @@ public class CassandraHelpLayout extends CommandLine.Help
     private static final String DESCRIPTION_HEADING = "NAME%n";
     private static final String SYNOPSIS_HEADING = "SYNOPSIS%n";
     private static final String OPTIONS_HEADING = "OPTIONS%n";
-    private static final int COLUMN_INDENT = 8;
     private static final int DESCRIPTION_INDENT = 4;
-    private static final int SUBCOMMANDS_INDENT = 4;
+    public static final int COLUMN_INDENT = 8;
+    public static final int SUBCOMMANDS_INDENT = 4;
     private static final CommandLine.Model.OptionSpec CASSANDRA_END_OF_OPTIONS_OPTION =
         CommandLine.Model.OptionSpec.builder("--")
                                     .description("This option can be used to separate command-line options from the " +
@@ -70,9 +70,10 @@ public class CassandraHelpLayout extends CommandLine.Help
                                                  "command-line options")
                                     .arity("0")
                                     .build();
-    private static final String TOP_LEVEL_SYNOPSIS_LIST_PREFIX = "usage:";
-    private static final String TOP_LEVEL_COMMAND_HEADING = "The most commonly used nodetool commands are:%n";
-    private static final String SYNOPSIS_SUBCOMMANDS_LABEL = "<command> [<args>]";
+    public static final String TOP_LEVEL_SYNOPSIS_LIST_PREFIX = "usage:";
+    public static final String TOP_LEVEL_COMMAND_HEADING = "The most commonly used nodetool commands are:";
+    public static final String USAGE_HELP_FOOTER = "See 'nodetool help <command>' for more information on a specific command.";
+    public static final String SYNOPSIS_SUBCOMMANDS_LABEL = "<command> [<args>]";
 
     public CassandraHelpLayout(CommandLine.Model.CommandSpec spec, ColorScheme scheme)
     {
@@ -340,29 +341,29 @@ public class CassandraHelpLayout extends CommandLine.Help
         return table.toString();
     }
 
-    @Override
-    public String footerHeading(Object... params)
-    {
-        return createHeading("%n", params);
-    }
+//    @Override
+//    public String footerHeading(Object... params)
+//    {
+//        return createHeading("%n", params);
+//    }
 
     @Override
     public String footer(Object... params)
     {
-
-        String[] footer = isEmpty(
-            commandSpec().usageMessage().footer()) ? new String[]{ "See 'nodetool help <command>' for more information on a specific command." } :
+        String[] footer = isEmpty(commandSpec().usageMessage().footer()) ? new String[]{ USAGE_HELP_FOOTER } :
                           commandSpec().usageMessage().footer();
-        return join(ansi(),
-                    commandSpec().usageMessage().width(),
-                    commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters(),
-                    footer,
-                    new StringBuilder(),
-                    params).toString();
+        StringBuilder sb = new StringBuilder();
+        TextTable table = TextTable.forColumnWidths(ansi(), commandSpec().usageMessage().width());
+        table.setAdjustLineBreaksForWideCJKCharacters(commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters());
+        table.indentWrappedLines = 0;
+        for (String summaryLine : footer)
+            table.addRowValues(String.format(summaryLine, params));
+        table.toString(sb);
+        return table.toString();
     }
 
     public String topLevelCommandListHeading(Object... params) {
-        return createHeading(TOP_LEVEL_COMMAND_HEADING, params);
+        return createHeading(TOP_LEVEL_COMMAND_HEADING + "%n", params);
     }
 
     public String topLevelSynopsis(Object... params)

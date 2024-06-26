@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import javax.inject.Inject;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 
 import org.apache.cassandra.management.BaseCommand;
@@ -34,6 +33,7 @@ import picocli.CommandLine;
 import static java.lang.Integer.parseInt;
 import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.promptAndReadPassword;
 import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.readUserPasswordFromFile;
+import static org.apache.cassandra.tools.NodeToolV2.lastExecutableSubcommandWithSameParent;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
@@ -75,9 +75,7 @@ public class JmxConnectionMixin
      */
     public static int executionStrategy(CommandLine.ParseResult parseResult)
     {
-        List<CommandLine> parsedCommands = parseResult.asCommandLineList();
-        int start = indexOfLastSubcommandWithSameParent(parsedCommands);
-        CommandLine.Model.CommandSpec lastParent = parsedCommands.get(start).getCommandSpec();
+        CommandLine.Model.CommandSpec lastParent = lastExecutableSubcommandWithSameParent(parseResult.asCommandLineList());
         CommandLine.Model.CommandSpec jmx = lastParent.mixins().get(MIXIN_KEY);
         if (jmx == null)
             throw new CommandLine.InitializationException("No JmxConnect mixin found in the command hierarchy");
@@ -85,18 +83,6 @@ public class JmxConnectionMixin
         if (lastParent.userObject() instanceof BaseCommand)
             ((BaseCommand) lastParent.userObject()).setBridge(((JmxConnectionMixin) jmx.userObject()).init(lastParent));
         return new CommandLine.RunLast().execute(parseResult);
-    }
-
-    private static int indexOfLastSubcommandWithSameParent(List<CommandLine> parsedCommands)
-    {
-        int start = parsedCommands.size() - 1;
-        for (int i = parsedCommands.size() - 2; i >= 0; i--)
-        {
-            if (parsedCommands.get(i).getParent() != parsedCommands.get(i + 1).getParent())
-                break;
-            start = i;
-        }
-        return start;
     }
 
     /**

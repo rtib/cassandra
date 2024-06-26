@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.tools.nodetool;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +28,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import org.apache.cassandra.cql3.CQLTester;
+import org.apache.cassandra.tools.NodeTool;
+import org.apache.cassandra.tools.NodeToolV2;
 import org.apache.cassandra.tools.ToolRunner;
 
 @RunWith(Parameterized.class)
@@ -34,8 +37,8 @@ public abstract class CQLToolRunnerTester extends CQLTester
 {
     public static final Map<String, ToolHandler> runnersMap = Map.of(
         "invokeNodetool", ToolRunner::invokeNodetool,
-        "invokeNodetoolInJvmV1", ToolRunner::invokeNodetoolInJvmV1,
-        "invokeNodetoolInJvmV2", ToolRunner::invokeNodetoolInJvmV2);
+        "invokeNodetoolInJvmV1", CQLToolRunnerTester::invokeNodetoolInJvmV1,
+        "invokeNodetoolInJvmV2", CQLToolRunnerTester::invokeNodetoolInJvmV2);
 
     @Parameterized.Parameter
     public String runner;
@@ -47,15 +50,38 @@ public abstract class CQLToolRunnerTester extends CQLTester
     }
 
     @BeforeClass
-    public static void setupNetwork() throws Throwable
+    public static void setUpClass()
     {
+        CQLTester.setUpClass();
         requireNetwork();
-        startJMXServer();
+        try
+        {
+            startJMXServer();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     protected ToolRunner.ToolResult invokeNodetool(String... args)
     {
         return runnersMap.get(runner).execute(args);
+    }
+
+    public static ToolRunner.ToolResult invokeNodetoolInJvmV2(String... commands)
+    {
+        return ToolRunner.invokeNodetoolInJvm(NodeToolV2::new, commands);
+    }
+
+    public static ToolRunner.ToolResult invokeNodetoolInJvmV1(String... commands)
+    {
+        return ToolRunner.invokeNodetoolInJvm(NodeTool::new, commands);
+    }
+
+    public static List<String> sliceStdout(ToolRunner.ToolResult result)
+    {
+        return Arrays.asList(result.getStdout().split("\\R"));
     }
 
     public interface ToolHandler

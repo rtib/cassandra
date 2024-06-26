@@ -19,6 +19,10 @@ package org.apache.cassandra.tools;
 
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 
 import com.google.common.base.Throwables;
@@ -43,6 +47,17 @@ public class NodeToolV2
 
     private final INodeProbeFactory nodeProbeFactory;
     private final Output output;
+    private CommandLine.IParameterExceptionHandler parameterExceptionHandler = (ex, arg) -> {
+        badUse(ex.getCommandLine().getOut()::println, Throwables.getRootCause(ex));
+        return 1;
+    };
+
+    private CommandLine.IExecutionExceptionHandler executionExceptionHandler = (ex, cmdLine, parseResult) -> {
+        err(cmdLine.getErr()::println, Throwables.getRootCause(ex));
+        return 2;
+    };
+
+    private CommandLine.IExecutionStrategy strategy;
 
     public static void main(String... args)
     {
@@ -62,36 +77,99 @@ public class NodeToolV2
      */
     public int execute(String... args)
     {
-        CommandLine.IFactory factory;
-        CommandLine commandLine = new CommandLine(new TopLevelCommand(), factory = new CassandraCliFactory(nodeProbeFactory, output));
+        return execute(createCommandLine(new CassandraCliFactory(nodeProbeFactory, output)), args);
+    }
 
-        configureCliLayout(commandLine);
-        commandLine.setOut(new PrintWriter(output.out, true))
-                   .setErr(new PrintWriter(output.err, true))
-                   .setExecutionExceptionHandler((ex, cmdLine, parseResult) -> {
-                       err(cmdLine.getErr()::println, Throwables.getRootCause(ex));
-                       return 2;
-                   })
-                   .setParameterExceptionHandler((ex, arg) -> {
-                       badUse(commandLine.getOut()::println, Throwables.getRootCause(ex));
-                       return 1;
-                   });
-
+    protected int execute(CommandLine commandLine, String... args)
+    {
         try
         {
-            JmxConnectionMixin mixin = factory.create(JmxConnectionMixin.class);
-            commandLine.setExecutionStrategy(JmxConnectionMixin::executionStrategy);
-            commandLine.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin);
-            commandLine.getSubcommands().values().forEach(sub -> sub.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin));
+            configureCliLayout(commandLine);
+            commandLine.setExecutionStrategy(strategy == null ? JmxConnectionMixin::executionStrategy : strategy)
+                       .setExecutionExceptionHandler(executionExceptionHandler)
+                       .setParameterExceptionHandler(parameterExceptionHandler);
 
             printHistory(args);
             return commandLine.execute(args);
         }
         catch (Exception e)
         {
-            err(commandLine.getErr()::println, e);
+            err(output.err::println, e);
             return 2;
         }
+    }
+
+    /**
+     * Filter the command by its name and return the given exit code when the filter is matched.
+     * @param commandPredicate the predicate to filter the command name.
+     * @param exitCodeWhenMatched the exit code to return when the filter is matched.
+     * @return this instance.
+     */
+    public NodeToolV2 withCommandNameFilter(Predicate<String> commandPredicate, int exitCodeWhenMatched)
+    {
+        strategy = parsed -> {
+            CommandLine.Model.CommandSpec spec = lastExecutableSubcommandWithSameParent(parsed.asCommandLineList());
+            if (commandPredicate.test(spec.name()))
+                return exitCodeWhenMatched;
+            return JmxConnectionMixin.executionStrategy(parsed);
+        };
+        return this;
+    }
+
+    public NodeToolV2 withParameterExceptionHandler(CommandLine.IParameterExceptionHandler handler)
+    {
+        parameterExceptionHandler = handler;
+        return this;
+    }
+
+    public NodeToolV2 withExecutionExceptionHandler(CommandLine.IExecutionExceptionHandler handler)
+    {
+        executionExceptionHandler = handler;
+        return this;
+    }
+
+    public boolean isCommandPresent(String commandName)
+    {
+        CommandLine commandLine = createCommandLine(new CassandraCliFactory(nodeProbeFactory, output));
+        return commandLine.getSubcommands().values().stream()
+                          .anyMatch(sub -> sub.getCommandName().equals(commandName));
+    }
+
+    public Map<String, String> getCommandsDescription()
+    {
+        Map<String, String> commands = new TreeMap<>();
+        CommandLine commandLine = createCommandLine(new CassandraCliFactory(nodeProbeFactory, output));
+        commandLine.getSubcommands()
+                   .values()
+                   .forEach(sub -> commands.put(sub.getCommandName(),
+                                                   CommandLine.Help.join(commandLine.getColorScheme().ansi(), 1000,
+                                                                         sub.getCommandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters(),
+                                                                         sub.getCommandSpec().usageMessage().description(), new StringBuilder()).toString()));
+        // Remove the help command from the list of commands, as it's not applicable for backward compatibility.
+        return commands;
+    }
+
+    public static CommandLine.Model.CommandSpec lastExecutableSubcommandWithSameParent(List<CommandLine> parsedCommands)
+    {
+        int start = parsedCommands.size() - 1;
+        for (int i = parsedCommands.size() - 2; i >= 0; i--)
+        {
+            if (parsedCommands.get(i).getParent() != parsedCommands.get(i + 1).getParent())
+                break;
+            start = i;
+        }
+        return parsedCommands.get(start).getCommandSpec();
+    }
+
+    private static CommandLine createCommandLine(CassandraCliFactory factory)
+    {
+        CommandLine commandLine = new CommandLine(new TopLevelCommand(), factory);
+        JmxConnectionMixin mixin = factory.create(JmxConnectionMixin.class);
+        commandLine.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin);
+        commandLine.getSubcommands().values().forEach(sub -> sub.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin));
+        commandLine.setOut(new PrintWriter(factory.output.out, true));
+        commandLine.setErr(new PrintWriter(factory.output.err, true));
+        return commandLine;
     }
 
     private static void configureCliLayout(CommandLine commandLine)
@@ -117,21 +195,28 @@ public class NodeToolV2
             this.output = output;
         }
 
-        public <K> K create(Class<K> cls) throws Exception
+        public <K> K create(Class<K> cls)
         {
-            Object bean = this.fallback.create(cls);
-            Field[] fields = bean.getClass().getDeclaredFields();
-            for (Field field : fields)
+            try
             {
-                if (!field.isAnnotationPresent(Inject.class))
-                    continue;
-                field.setAccessible(true);
-                if (field.getType().equals(INodeProbeFactory.class))
-                    field.set(bean, nodeProbeFactory);
-                else if (field.getType().equals(Output.class))
-                    field.set(bean, output);
+                Object bean = this.fallback.create(cls);
+                Field[] fields = bean.getClass().getDeclaredFields();
+                for (Field field : fields)
+                {
+                    if (!field.isAnnotationPresent(Inject.class))
+                        continue;
+                    field.setAccessible(true);
+                    if (field.getType().equals(INodeProbeFactory.class))
+                        field.set(bean, nodeProbeFactory);
+                    else if (field.getType().equals(Output.class))
+                        field.set(bean, output);
+                }
+                return (K) bean;
             }
-            return (K) bean;
+            catch (Exception e)
+            {
+                throw new CommandLine.InitializationException("Failed to create instance of " + cls, e);
+            }
         }
     }
 }
