@@ -107,14 +107,11 @@ public class NodeTool
     public int execute(String... args)
     {
         List<Class<? extends NodeToolCmdRunnable>> commands = newArrayList(
-                AbortBootstrap.class,
-                Assassinate.class,
                 CassHelp.class,
                 CIDRFilteringStats.class,
                 Cleanup.class,
                 ClearSnapshot.class,
                 ClientStats.class,
-//                Compact.class,
                 CompactionHistory.class,
                 CompactionStats.class,
                 DataPaths.class,
@@ -246,8 +243,7 @@ public class NodeTool
                 UpgradeSSTable.class,
                 Verify.class,
                 Version.class,
-                ViewBuildStatus.class,
-                ForceCompact.class
+                ViewBuildStatus.class
         );
 
         Cli.CliBuilder<NodeToolCmdRunnable> builder = Cli.builder("nodetool");

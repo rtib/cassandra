@@ -35,7 +35,7 @@ import org.mockito.Mockito;
 
 import static org.mockito.Mockito.when;
 
-public class NodeToolMBeanTest extends CQLToolRunnerTester
+public class NodeToolCommandsMBeanTest extends CQLToolRunnerTester
 {
     public static final String STORAGE_SERVICE_MBEAN = "org.apache.cassandra.db:type=StorageService";
     public static final String COMPACTION_MANAGER_MBEAN = "org.apache.cassandra.db:type=CompactionManager";

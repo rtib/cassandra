@@ -30,7 +30,7 @@ import com.github.difflib.patch.Patch;
 
 import static org.junit.Assert.assertTrue;
 
-public class NodeToolSynopsisTest extends CQLToolRunnerTester
+public class NodeToolHelpMessageTest extends CQLToolRunnerTester
 {
     @Test
     public void testCompareHelpCommand()
