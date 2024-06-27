@@ -24,11 +24,10 @@ import com.google.common.collect.Lists;
 
 import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.CommandUtils;
-import org.apache.cassandra.management.ServiceBridge;
+import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.parsePartitionKeys;
 
 @CommandLine.Command(name = "forcecompact", description = "Force a (major) compaction on a table")
@@ -49,7 +48,7 @@ public class ForceCompact extends BaseCommand
     public String[] keys;
 
     @Override
-    public void execute(ServiceBridge probe)
+    public void execute(ServiceMBeanBridge probe)
     {
         args = Lists.asList(keyspace, table, keys);
         // Check if the input has valid size
@@ -62,7 +61,7 @@ public class ForceCompact extends BaseCommand
 
         try
         {
-            ssProxy(probe).forceCompactionKeysIgnoringGcGrace(keyspaceName, tableName, partitionKeysIgnoreGcGrace);
+            probe.ssProxy().forceCompactionKeysIgnoringGcGrace(keyspaceName, tableName, partitionKeysIgnoreGcGrace);
         }
         catch (Exception e)
         {

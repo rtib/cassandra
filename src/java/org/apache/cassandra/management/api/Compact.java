@@ -21,11 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.ServiceBridge;
+import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 
-import static org.apache.cassandra.management.CommandUtils.cmProxy;
-import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.parseOptionalKeyspace;
 import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.parseOptionalTables;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
@@ -53,7 +51,7 @@ public class Compact extends BaseCommand
     public String partitionKey = EMPTY;
 
     @Override
-    public void execute(ServiceBridge probe)
+    public void execute(ServiceMBeanBridge probe)
     {
         final boolean startEndTokenProvided = !(startToken.isEmpty() && endToken.isEmpty());
         final boolean partitionKeyProvided = !partitionKey.isEmpty();
@@ -72,7 +70,7 @@ public class Compact extends BaseCommand
             try
             {
                 String userDefinedFiles = String.join(",", args);
-                cmProxy(probe).forceUserDefinedCompaction(userDefinedFiles);
+                probe.cmProxy().forceUserDefinedCompaction(userDefinedFiles);
             } catch (Exception e) {
                 throw new RuntimeException("Error occurred during user defined compaction", e);
             }
@@ -88,15 +86,15 @@ public class Compact extends BaseCommand
             {
                 if (startEndTokenProvided)
                 {
-                    ssProxy(probe).forceKeyspaceCompactionForTokenRange(keyspace, startToken, endToken, tableNames);
+                    probe.ssProxy().forceKeyspaceCompactionForTokenRange(keyspace, startToken, endToken, tableNames);
                 }
                 else if (partitionKeyProvided)
                 {
-                    ssProxy(probe).forceKeyspaceCompactionForPartitionKey(keyspace, partitionKey, tableNames);
+                    probe.ssProxy().forceKeyspaceCompactionForPartitionKey(keyspace, partitionKey, tableNames);
                 }
                 else
                 {
-                    ssProxy(probe).forceKeyspaceCompaction(splitOutput, keyspace, tableNames);
+                    probe.ssProxy().forceKeyspaceCompaction(splitOutput, keyspace, tableNames);
                 }
             } catch (Exception e)
             {

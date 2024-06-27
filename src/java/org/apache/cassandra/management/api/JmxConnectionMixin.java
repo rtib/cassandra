@@ -24,7 +24,7 @@ import javax.inject.Inject;
 import com.google.common.base.Throwables;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.ServiceBridge;
+import org.apache.cassandra.management.ServiceMBeanBridge;
 import org.apache.cassandra.tools.INodeProbeFactory;
 import org.apache.cassandra.tools.Output;
 import picocli.CommandLine;
@@ -89,7 +89,7 @@ public class JmxConnectionMixin
      * @param spec The command specification to be executed after the initialization.
      * @return The ServiceBridge instance to interact with the Cassandra node.
      */
-    private ServiceBridge init(CommandLine.Model.CommandSpec spec)
+    private ServiceMBeanBridge init(CommandLine.Model.CommandSpec spec)
     {
         try
         {

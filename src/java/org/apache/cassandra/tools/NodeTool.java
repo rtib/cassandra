@@ -60,7 +60,7 @@ import org.apache.cassandra.io.util.File;
 import org.apache.cassandra.io.util.FileWriter;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import org.apache.cassandra.management.CassandraHelpLayout;
-import org.apache.cassandra.management.ServiceBridge;
+import org.apache.cassandra.management.ServiceMBeanBridge;
 import org.apache.cassandra.tools.nodetool.*;
 import org.apache.cassandra.utils.FBUtilities;
 import picocli.CommandLine;
@@ -74,7 +74,6 @@ import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 import static org.apache.cassandra.io.util.File.WriteMode.APPEND;
-import static org.apache.cassandra.management.CommandUtils.ssProxy;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
@@ -561,12 +560,12 @@ public class NodeTool
             ALL, NON_SYSTEM, NON_LOCAL_STRATEGY
         }
 
-        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceBridge nodeProbe)
+        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceMBeanBridge nodeProbe)
         {
             return parseOptionalKeyspace(cmdArgs, nodeProbe, KeyspaceSet.ALL);
         }
 
-        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceBridge nodeProbe, KeyspaceSet defaultKeyspaceSet)
+        public static List<String> parseOptionalKeyspace(List<String> cmdArgs, ServiceMBeanBridge nodeProbe, KeyspaceSet defaultKeyspaceSet)
         {
             List<String> keyspaces = new ArrayList<>();
 
@@ -574,11 +573,11 @@ public class NodeTool
             if (cmdArgs == null || cmdArgs.isEmpty())
             {
                 if (defaultKeyspaceSet == KeyspaceSet.NON_LOCAL_STRATEGY)
-                    keyspaces.addAll(keyspaces = ssProxy(nodeProbe).getNonLocalStrategyKeyspaces());
+                    keyspaces.addAll(keyspaces = nodeProbe.ssProxy().getNonLocalStrategyKeyspaces());
                 else if (defaultKeyspaceSet == KeyspaceSet.NON_SYSTEM)
-                    keyspaces.addAll(keyspaces = ssProxy(nodeProbe).getNonSystemKeyspaces());
+                    keyspaces.addAll(keyspaces = nodeProbe.ssProxy().getNonSystemKeyspaces());
                 else
-                    keyspaces.addAll(ssProxy(nodeProbe).getKeyspaces());
+                    keyspaces.addAll(nodeProbe.ssProxy().getKeyspaces());
             }
             else
             {
@@ -587,7 +586,7 @@ public class NodeTool
 
             for (String keyspace : keyspaces)
             {
-                if (!ssProxy(nodeProbe).getKeyspaces().contains(keyspace))
+                if (!nodeProbe.ssProxy().getKeyspaces().contains(keyspace))
                     throw new IllegalArgumentException("Keyspace [" + keyspace + "] does not exist.");
             }
 

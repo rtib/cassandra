@@ -18,10 +18,24 @@
 
 package org.apache.cassandra.management;
 
+import org.apache.cassandra.db.compaction.CompactionManagerMBean;
+import org.apache.cassandra.service.StorageServiceMBean;
+
 /**
- * Management context for nodetool commands to access management services like StorageServiceMBean etc.
+ * Service bridge for Cassandra management commands to access MBeans and other service-related functionality.
+ * This interface is used to bridge the gap between the nodetool commands and the Cassandra service MBeans.
  */
-public interface ServiceBridge
+public interface ServiceMBeanBridge
 {
-    <T> T mBean(Class<T> clazz);
+    <T> T getMBean(Class<T> clazz);
+
+    default StorageServiceMBean ssProxy()
+    {
+        return getMBean(StorageServiceMBean.class);
+    }
+
+    default CompactionManagerMBean cmProxy()
+    {
+        return getMBean(CompactionManagerMBean.class);
+    }
 }

@@ -21,9 +21,9 @@ package org.apache.cassandra.management;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.cassandra.db.compaction.CompactionManagerMBean;
-import org.apache.cassandra.service.StorageServiceMBean;
-
+/**
+ * Utility methods for nodetool commands.
+ */
 public final class CommandUtils
 {
     public static final String CASSANDRA_BACKWARD_COMPATIBLE_MARKER = "cassandra-backward-compatible";
@@ -47,15 +47,5 @@ public final class CommandUtils
         for (Object value : any)
             result = Math.max(result, String.valueOf(value).length());
         return result;
-    }
-
-    public static StorageServiceMBean ssProxy(ServiceBridge bridge)
-    {
-        return bridge.mBean(StorageServiceMBean.class);
-    }
-
-    public static CompactionManagerMBean cmProxy(ServiceBridge bridge)
-    {
-        return bridge.mBean(CompactionManagerMBean.class);
     }
 }

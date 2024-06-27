@@ -29,14 +29,14 @@ public abstract class BaseCommand implements Runnable
     @CommandLine.Spec
     protected CommandLine.Model.CommandSpec spec; // injected by picocli
     /** The ServiceBridge instance to interact with the Cassandra node. */
-    protected ServiceBridge bridge;
+    protected ServiceMBeanBridge bridge;
 
     /**
      * The ServiceBridge instance is injected by the picocli framework during command execution and is used to
      * interact with the Cassandra node. This method is called by picocli and used depending on the execution strategy.
      * @param bridge The ServiceBridge instance to inject.
      */
-    public void setBridge(ServiceBridge bridge)
+    public void setBridge(ServiceMBeanBridge bridge)
     {
         this.bridge = bridge;
     }
@@ -47,5 +47,5 @@ public abstract class BaseCommand implements Runnable
         execute(bridge);
     }
 
-    protected abstract void execute(ServiceBridge probe);
+    protected abstract void execute(ServiceMBeanBridge probe);
 }
