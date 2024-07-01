@@ -46,7 +46,7 @@ public class NodeToolHelpMessageTest extends CQLToolRunnerTester
     @Test
     public void testBaseCommandOutput()
     {
-        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolInJvmV1());
+        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolInJvmV1("help", "forcecompact"));
         System.out.println(printFormattedNodeToolOutput(outNodeToolV2));
     }
 

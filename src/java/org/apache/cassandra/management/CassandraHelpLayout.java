@@ -27,10 +27,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
+import org.apache.cassandra.utils.Pair;
 import picocli.CommandLine;
 
 import static org.apache.cassandra.management.CommandUtils.leadingSpaces;
+import static org.apache.cassandra.management.CommandUtils.findBackwardCompatibleArgument;
 import static org.apache.commons.lang3.ArrayUtils.isEmpty;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST_HEADING;
@@ -204,8 +207,13 @@ public class CassandraHelpLayout extends CommandLine.Help
         List<CommandLine.Model.PositionalParamSpec> positionals = cassandraPositionals(commandSpec());
         positionals.removeAll(done);
 
-        IParamLabelRenderer parameterLabelRenderer = createMinimalSpacedParamLabelRenderer();
+        Pair<String, String> commandArgumensSpec = findBackwardCompatibleArgument(commandSpec().userObject());
         Ansi.Text text = colorScheme().text("");
+        // If the command has a backward compatible argument, use it to generate the synopsis based on the old format.
+        if (commandArgumensSpec != null)
+            return colorScheme().parameterText(commandArgumensSpec.left);
+
+        IParamLabelRenderer parameterLabelRenderer = CassandraStyleParamLabelRender.create();
         for (CommandLine.Model.PositionalParamSpec positionalParam : positionals)
         {
             Ansi.Text label = parameterLabelRenderer.renderParameterLabel(positionalParam, colorScheme().ansi(), colorScheme().parameterStyles());
@@ -223,7 +231,7 @@ public class CassandraHelpLayout extends CommandLine.Help
         optionList.removeAll(done);
 
         ColorScheme colorScheme = colorScheme();
-        IParamLabelRenderer parameterLabelRenderer = createMinimalSpacedParamLabelRenderer();
+        IParamLabelRenderer parameterLabelRenderer = CassandraStyleParamLabelRender.create();
 
         for (CommandLine.Model.OptionSpec option : optionList)
         {
@@ -247,28 +255,6 @@ public class CassandraHelpLayout extends CommandLine.Help
         return result;
     }
 
-    public static IParamLabelRenderer createMinimalSpacedParamLabelRenderer()
-    {
-        return new IParamLabelRenderer()
-        {
-            public Ansi.Text renderParameterLabel(CommandLine.Model.ArgSpec argSpec, Ansi ansi, List<Ansi.IStyle> styles)
-            {
-                ColorScheme colorScheme = CommandLine.Help.defaultColorScheme(ansi);
-                if (argSpec.equals(CASSANDRA_END_OF_OPTIONS_OPTION))
-                    return colorScheme.text("");
-                if (argSpec instanceof CommandLine.Model.OptionSpec && argSpec.typeInfo().isBoolean())
-                    return colorScheme.text("");
-                return argSpec.isOption() ? colorScheme.optionText(argSpec.paramLabel()) :
-                       colorScheme.parameterText(argSpec.paramLabel());
-            }
-
-            public String separator()
-            {
-                return "";
-            }
-        };
-    }
-
     @Override
     public String optionListHeading(Object... params)
     {
@@ -285,32 +271,65 @@ public class CassandraHelpLayout extends CommandLine.Help
         options.sort(comparator);
 
         Layout layout = cassandraSingleColumnOptionsParametersLayout();
-        layout.addAllOptions(options, createMinimalSpacedParamLabelRenderer());
+        layout.addAllOptions(options, CassandraStyleParamLabelRender.create());
         return layout.toString();
     }
 
     @Override
     public String endOfOptionsList() {
         Layout layout = cassandraSingleColumnOptionsParametersLayout();
-        layout.addOption(CASSANDRA_END_OF_OPTIONS_OPTION, createMinimalSpacedParamLabelRenderer());
+        layout.addOption(CASSANDRA_END_OF_OPTIONS_OPTION, CassandraStyleParamLabelRender.create());
         return layout.toString();
     }
 
     private Layout cassandraSingleColumnOptionsParametersLayout()
     {
+        return new Layout(colorScheme(), configureLayoutTextTable(), new CassandraStyleOptionRenderer(), new CassandraStyleParameterRenderer());
+    }
+
+    private TextTable configureLayoutTextTable()
+    {
         TextTable table = TextTable.forColumns(colorScheme(), new Column(commandSpec().usageMessage().width() - COLUMN_INDENT,
                                                                          COLUMN_INDENT, Column.Overflow.WRAP));
         table.setAdjustLineBreaksForWideCJKCharacters(commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters());
         table.indentWrappedLines = DESCRIPTION_INDENT;
-        return new Layout(colorScheme(), table, new CassandraStyleOptionRenderer(), new CassandraStyleParameterRenderer());
+        return table;
     }
 
     @Override
     public String parameterList()
     {
+        Pair<String, String> cassandraArgument = findBackwardCompatibleArgument(commandSpec().userObject());
         List<CommandLine.Model.PositionalParamSpec> positionalParams = cassandraPositionals(commandSpec());
-        Layout layout = cassandraSingleColumnOptionsParametersLayout();
-        layout.addAllPositionalParameters(positionalParams, createMinimalSpacedParamLabelRenderer());
+        Layout layout = cassandraArgument == null ?
+                        cassandraSingleColumnOptionsParametersLayout() :
+                        new Layout(colorScheme(),
+                                   configureLayoutTextTable(),
+                                   new CassandraStyleOptionRenderer(),
+                                   new CassandraStyleParameterRenderer())
+                        {
+                            // If the command has a backward compatible argument, use it to generate the synopsis
+                            // based on the old format.
+                            @Override
+                            public void layout(CommandLine.Model.ArgSpec argSpec, Ansi.Text[][] cellValues)
+                            {
+                                Ansi.Text descPadding = Ansi.OFF.new Text(leadingSpaces(DESCRIPTION_INDENT), colorScheme);
+                                cellValues[0] = new Ansi.Text[]{ colorScheme.parameterText(cassandraArgument.left) };
+                                cellValues[1] = new Ansi.Text[]{ descPadding.concat(colorScheme.parameterText(cassandraArgument.right)) };
+                                cellValues[2] = new Ansi.Text[]{ Ansi.OFF.new Text("", colorScheme) };
+                                for (Ansi.Text[] oneRow : cellValues)
+                                    table.addRowValues(oneRow);
+                            }
+
+                            @Override
+                            public void addAllPositionalParameters(List<CommandLine.Model.PositionalParamSpec> params,
+                                                                   IParamLabelRenderer paramLabelRenderer)
+                            {
+                                layout(null, new Ansi.Text[3][]);
+                            }
+                        };
+
+        layout.addAllPositionalParameters(positionalParams, CassandraStyleParamLabelRender.create());
         return layout.toString();
     }
 
@@ -341,12 +360,6 @@ public class CassandraHelpLayout extends CommandLine.Help
         return table.toString();
     }
 
-//    @Override
-//    public String footerHeading(Object... params)
-//    {
-//        return createHeading("%n", params);
-//    }
-
     @Override
     public String footer(Object... params)
     {
@@ -374,20 +387,7 @@ public class CassandraHelpLayout extends CommandLine.Help
     private static List<CommandLine.Model.PositionalParamSpec> cassandraPositionals(CommandLine.Model.CommandSpec commandSpec)
     {
         List<CommandLine.Model.PositionalParamSpec> positionals = new ArrayList<>(commandSpec.positionalParameters());
-        for (CommandLine.Model.PositionalParamSpec param : positionals)
-        {
-            if (param.hidden())
-            {
-                if (param.description()[0].equals(CommandUtils.CASSANDRA_BACKWARD_COMPATIBLE_MARKER))
-                {
-                    positionals.clear();
-                    positionals.add(param);
-                    break;
-                }
-                else
-                    positionals.remove(param);
-            }
-        }
+        positionals.removeIf(CommandLine.Model.ArgSpec::hidden);
         return positionals;
     }
 
@@ -447,6 +447,29 @@ public class CassandraHelpLayout extends CommandLine.Help
                scheme.text(" ").concat(parameterLabelRenderer.renderParameterLabel(optionSpec, scheme.ansi(), scheme.optionParamStyles()));
     }
 
+    private static class CassandraStyleParamLabelRender implements IParamLabelRenderer
+    {
+        public static IParamLabelRenderer create()
+        {
+            return new CassandraStyleParamLabelRender();
+        }
+
+        @Override
+        public Ansi.Text renderParameterLabel(CommandLine.Model.ArgSpec argSpec, Ansi ansi, List<Ansi.IStyle> styles)
+        {
+            ColorScheme colorScheme = CommandLine.Help.defaultColorScheme(ansi);
+            if (argSpec.equals(CASSANDRA_END_OF_OPTIONS_OPTION))
+                return colorScheme.text("");
+            if (argSpec instanceof CommandLine.Model.OptionSpec && argSpec.typeInfo().isBoolean())
+                return colorScheme.text("");
+            return argSpec.isOption() ? colorScheme.optionText(argSpec.paramLabel()) :
+                   colorScheme.parameterText(argSpec.paramLabel());
+        }
+
+        @Override
+        public String separator() { return ""; }
+    }
+
     private static class CassandraStyleOptionRenderer implements IOptionRenderer
     {
         public Ansi.Text[][] render(CommandLine.Model.OptionSpec option, IParamLabelRenderer parameterLabelRenderer, ColorScheme scheme)
@@ -476,9 +499,7 @@ public class CassandraHelpLayout extends CommandLine.Help
         @Override
         public Ansi.Text[][] render(CommandLine.Model.PositionalParamSpec param, IParamLabelRenderer parameterLabelRenderer, ColorScheme scheme)
         {
-            String descriptionString = param.description()[0].equals(CommandUtils.CASSANDRA_BACKWARD_COMPATIBLE_MARKER) ?
-                                       param.description()[1] : param.description()[0];
-
+            String descriptionString = param.description()[0];
             Ansi.Text descPadding = Ansi.OFF.new Text(leadingSpaces(DESCRIPTION_INDENT), scheme);
             Ansi.Text[][] result = new Ansi.Text[3][];
             result[0] = new Ansi.Text[]{ parameterLabelRenderer.renderParameterLabel(param, scheme.ansi(), scheme.parameterStyles()) };

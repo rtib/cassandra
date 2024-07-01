@@ -18,16 +18,17 @@
 
 package org.apache.cassandra.management;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collection;
+
+import org.apache.cassandra.utils.Pair;
 
 /**
  * Utility methods for nodetool commands.
  */
 public final class CommandUtils
 {
-    public static final String CASSANDRA_BACKWARD_COMPATIBLE_MARKER = "cassandra-backward-compatible";
-
     /**
      * Returns a string with the given number of leading spaces.
      *
@@ -47,5 +48,19 @@ public final class CommandUtils
         for (Object value : any)
             result = Math.max(result, String.valueOf(value).length());
         return result;
+    }
+
+    public static Pair<String, String> findBackwardCompatibleArgument(Object userObject)
+    {
+        Class<?> clazz = userObject.getClass();
+        for (Field field : clazz.getFields())
+        {
+            if (field.isAnnotationPresent(CassandraCliArgument.class))
+            {
+                CassandraCliArgument ann = field.getAnnotation(CassandraCliArgument.class);
+                return Pair.create(ann.usage(), ann.description());
+            }
+        }
+        return null;
     }
 }

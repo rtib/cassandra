@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.cassandra.management.BaseCommand;
+import org.apache.cassandra.management.CassandraCliArgument;
 import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 
