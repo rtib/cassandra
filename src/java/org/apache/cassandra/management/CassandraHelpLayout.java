@@ -27,13 +27,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 
 import org.apache.cassandra.utils.Pair;
 import picocli.CommandLine;
 
-import static org.apache.cassandra.management.CommandUtils.leadingSpaces;
 import static org.apache.cassandra.management.CommandUtils.findBackwardCompatibleArgument;
+import static org.apache.cassandra.management.CommandUtils.leadingSpaces;
 import static org.apache.commons.lang3.ArrayUtils.isEmpty;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST_HEADING;

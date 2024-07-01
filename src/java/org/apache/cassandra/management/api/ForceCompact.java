@@ -24,7 +24,6 @@ import com.google.common.collect.Lists;
 
 import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.CassandraCliArgument;
-import org.apache.cassandra.management.CommandUtils;
 import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 

@@ -18,15 +18,19 @@
 
 package org.apache.cassandra.tools.nodetool;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import com.github.difflib.DiffUtils;
+import com.github.difflib.patch.AbstractDelta;
+import com.github.difflib.patch.Patch;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.tools.NodeTool;
 import org.apache.cassandra.tools.NodeToolV2;
@@ -36,17 +40,17 @@ import org.apache.cassandra.tools.ToolRunner;
 public abstract class CQLToolRunnerTester extends CQLTester
 {
     public static final Map<String, ToolHandler> runnersMap = Map.of(
-        "invokeNodetool", ToolRunner::invokeNodetool,
         "invokeNodetoolInJvmV1", CQLToolRunnerTester::invokeNodetoolInJvmV1,
         "invokeNodetoolInJvmV2", CQLToolRunnerTester::invokeNodetoolInJvmV2);
 
     @Parameterized.Parameter
     public String runner;
 
-    @Parameterized.Parameters(name = "{0}")
-    public static Set<String> runners()
-    {
-        return runnersMap.keySet();
+    @Parameterized.Parameters
+    public static Collection<Object[]> data() {
+        List<Object[]> res = new ArrayList<>();
+        runnersMap.forEach((k, v) -> res.add(new Object[]{ k }));
+        return res;
     }
 
     @BeforeClass
@@ -88,5 +92,46 @@ public abstract class CQLToolRunnerTester extends CQLTester
     {
         ToolRunner.ToolResult execute(String... args);
         default ToolRunner.ToolResult execute(List<String> args) { return execute(args.toArray(new String[0])); }
+    }
+
+
+    protected static String printFormattedDiffsMessage(List<String> stdoutOrig,
+                                                     List<String> stdoutNew,
+                                                     String commandName,
+                                                     String diff)
+    {
+        return '\n' + ">> source <<" + '\n' +
+               printFormattedNodeToolOutput(stdoutOrig) +
+               '\n' + ">> target <<" +
+               '\n' + printFormattedNodeToolOutput(stdoutNew) +
+               '\n' + " difference for \"" + commandName + "\":" + diff;
+    }
+
+    protected static String printFormattedNodeToolOutput(List<String> output)
+    {
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0; i < output.size(); i++)
+        {
+            sb.append(i).append(':').append(output.get(i));
+            if(i < output.size() - 1)
+                sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    protected static String computeDiff(List<String> original, List<String> revised) {
+        Patch<String> patch = DiffUtils.diff(original, revised);
+        List<String> diffLines = new ArrayList<>();
+
+        for (AbstractDelta<String> delta : patch.getDeltas()) {
+            for (String line : delta.getSource().getLines()) {
+                diffLines.add(delta.getType().toString().toLowerCase() + " source: " + line);
+            }
+            for (String line : delta.getTarget().getLines()) {
+                diffLines.add(delta.getType().toString().toLowerCase() + " target: " + line);
+            }
+        }
+
+        return '\n' + String.join("\n", diffLines);
     }
 }
