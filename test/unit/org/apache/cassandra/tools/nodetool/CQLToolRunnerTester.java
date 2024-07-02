@@ -46,7 +46,7 @@ public abstract class CQLToolRunnerTester extends CQLTester
     @Parameterized.Parameter
     public String runner;
 
-    @Parameterized.Parameters
+    @Parameterized.Parameters(name = "runner={0}")
     public static Collection<Object[]> data() {
         List<Object[]> res = new ArrayList<>();
         runnersMap.forEach((k, v) -> res.add(new Object[]{ k }));

@@ -34,7 +34,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 @CommandLine.Command(name = "compact", description = "Force a (major) compaction on one or more tables or user-defined compaction on given SSTables")
 public class Compact extends BaseCommand
 {
-    @CassandraCliArgument(usage = "[<keyspace> <tables>...] or [<SSTable file>]",
+    @CassandraCliArgument(usage = "[<keyspace> <tables>...] or <SSTable file>...",
         description = "The keyspace followed by one or many tables or list of SSTable data files when using --user-defined")
     public List<String> args = new ArrayList<>();
     @CommandLine.ArgGroup(exclusive = false)

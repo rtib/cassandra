@@ -43,8 +43,8 @@ public class NodeToolHelpCommandTest extends CQLToolRunnerTester
     public static Collection<Object[]> data()
     {
         List<Object[]> res = new ArrayList<>();
-        for (String command : COMMANDS)
-            for (String tool : runnersMap.keySet())
+        for (String tool : runnersMap.keySet())
+            for (String command : COMMANDS)
                 res.add(new Object[]{ tool, command });
         return res;
     }
