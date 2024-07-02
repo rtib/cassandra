@@ -40,6 +40,7 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 /**
  * Command options for NodeTool commands that are executed via JMX.
  */
+@CommandLine.Command(name = "connect", description = "Connect to a Cassandra node via JMX")
 public class JmxConnectionMixin
 {
     public static final String MIXIN_KEY = "jmx";
@@ -74,11 +75,11 @@ public class JmxConnectionMixin
      */
     public static int executionStrategy(CommandLine.ParseResult parseResult)
     {
-        CommandLine.Model.CommandSpec lastParent = lastExecutableSubcommandWithSameParent(parseResult.asCommandLineList());
-        CommandLine.Model.CommandSpec jmx = lastParent.mixins().get(MIXIN_KEY);
+        CommandLine.Model.CommandSpec jmx = parseResult.commandSpec().mixins().get(MIXIN_KEY);
         if (jmx == null)
             throw new CommandLine.InitializationException("No JmxConnect mixin found in the command hierarchy");
 
+        CommandLine.Model.CommandSpec lastParent = lastExecutableSubcommandWithSameParent(parseResult.asCommandLineList());
         if (lastParent.userObject() instanceof BaseCommand)
             ((BaseCommand) lastParent.userObject()).setBridge(((JmxConnectionMixin) jmx.userObject()).init(lastParent));
         return new CommandLine.RunLast().execute(parseResult);

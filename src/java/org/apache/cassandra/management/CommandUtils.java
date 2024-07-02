@@ -21,6 +21,7 @@ package org.apache.cassandra.management;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 
 import org.apache.cassandra.utils.Pair;
 
@@ -62,5 +63,11 @@ public final class CommandUtils
             }
         }
         return null;
+    }
+
+    public static String[] sortShortestFirst(String[] names)
+    {
+        Arrays.sort(names, Comparator.comparing(String::length));
+        return names;
     }
 }

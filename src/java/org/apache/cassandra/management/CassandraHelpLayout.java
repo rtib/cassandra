@@ -19,20 +19,19 @@
 package org.apache.cassandra.management;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.cassandra.utils.Pair;
 import picocli.CommandLine;
 
 import static org.apache.cassandra.management.CommandUtils.findBackwardCompatibleArgument;
 import static org.apache.cassandra.management.CommandUtils.leadingSpaces;
+import static org.apache.cassandra.management.CommandUtils.sortShortestFirst;
 import static org.apache.commons.lang3.ArrayUtils.isEmpty;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST;
 import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST_HEADING;
@@ -58,7 +57,7 @@ import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_SYNOPSIS_HE
  */
 public class CassandraHelpLayout extends CommandLine.Help
 {
-    public static final int DEFAULT_USAGE_HELP_WIDTH = 90;
+    public static final int DEFAULT_USAGE_HELP_WIDTH = 85;
     private static final String DESCRIPTION_HEADING = "NAME%n";
     private static final String SYNOPSIS_HEADING = "SYNOPSIS%n";
     private static final String OPTIONS_HEADING = "OPTIONS%n";
@@ -138,11 +137,15 @@ public class CassandraHelpLayout extends CommandLine.Help
         CommandLine.Model.CommandSpec commandSpec = commandSpec();
         ColorScheme colorScheme = colorScheme();
 
-        Set<CommandLine.Model.ArgSpec> argsInGroups = new HashSet<>();
-        Ansi.Text groupsText = createDetailedSynopsisGroupsText(argsInGroups);
-        List<Ansi.Text> optionsList = createCassandraSynopsisOptionsText(argsInGroups);
-        Ansi.Text endOfOptionsText = createDetailedSynopsisEndOfOptionsText();
-        Ansi.Text positionalParamText = createCassandraSynopsisPositionalsText(argsInGroups);
+        List<Ansi.Text> parentOptionsList = createCassandraSynopsisOptionsText(parentCommandOptions(commandSpec));
+        List<Ansi.Text> commandOptionsList = createCassandraSynopsisOptionsText(commandSpec.options());
+
+        Ansi.Text positionalParamText = createCassandraSynopsisPositionalsText(commandSpec, colorScheme);
+        Ansi.Text endOfOptionsText = positionalParamText.plainString().isEmpty() ?
+                                     colorScheme.text("") :
+                                     colorScheme.text("[")
+                                                .concat(commandSpec.parser().endOfOptionsDelimiter())
+                                                .concat("]");
         Ansi.Text commandText = createCassandraSynopsisCommandText();
 
         int width = commandSpec.usageMessage().width();
@@ -153,81 +156,62 @@ public class CassandraHelpLayout extends CommandLine.Help
         textTable.indentWrappedLines = COLUMN_INDENT;
         textTable.setAdjustLineBreaksForWideCJKCharacters(commandSpec.usageMessage().adjustLineBreaksForWideCJKCharacters());
 
-        // All other fields added to the synopsis are left-adjusted, so we don't need to align them.
-        Ansi.Text text = groupsText.concat(isEmptyParent ? Ansi.OFF.new Text(0) :
-                                           colorScheme.text(" ").concat(commandSpec.name()))
-                                   .concat(endOfOptionsText).concat(" ")
-                                   .concat(positionalParamText).concat(commandText);
-        Ansi.Text padding = Ansi.OFF.new Text(leadingSpaces(mainCommandText.plainString().length()), colorScheme);
-        List<Ansi.Text> alignedOptions = alignByWidth(optionsList,
-                                                      width - columnIndent - textTable.indentWrappedLines - synopsisPrefix.length(),
-                                                      colorScheme);
-        // Align options by width
-        for (int i = 0; i < alignedOptions.size(); i++)
-        {
-            Ansi.Text option = alignedOptions.get(i);
-            if (i == 0)
-                option = colorScheme.text(synopsisPrefix).concat(synopsisPrefix.isEmpty() ? "" : " ")
-                                    .concat(mainCommandText).concat(" ")
-                                    .concat(option);
-            else
-                option = padding.concat(option);
-
-            if (i == alignedOptions.size() - 1)
-                textTable.addRowValues(option.concat(text));
-            else
-                textTable.addRowValues(option);
-        }
+        // List<Text>
+        new LineBreakingLayout(colorScheme, width, textTable)
+            .concatItem(synopsisPrefix.isEmpty() ? mainCommandText : colorScheme.text(synopsisPrefix).concat(" ").concat(mainCommandText))
+            .concatItems(parentOptionsList)
+            .concatItem(isEmptyParent ? colorScheme.text("") : colorScheme.text(commandSpec.name()))
+            .concatItems(commandOptionsList)
+            .concatItem(endOfOptionsText)
+            // All other fields added to the synopsis are left-adjusted, so we don't need to add them one by one.
+            .flush(positionalParamText.concat(commandText));
 
         textTable.addEmptyRow();
         return textTable.toString();
     }
 
-    private static List<Ansi.Text> alignByWidth(List<Ansi.Text> optionsList, int width, ColorScheme colorScheme)
+    private static Ansi.Text createCassandraSynopsisPositionalsText(CommandLine.Model.CommandSpec spec,
+                                                                    ColorScheme colorScheme)
     {
-        List<Ansi.Text> result = new ArrayList<>();
-        Ansi.Text current = Ansi.OFF.new Text("", colorScheme);
-        for (Ansi.Text option : optionsList)
-        {
-            if (current.plainString().length() + option.plainString().length() >= width)
-            {
-                result.add(current);
-                current = Ansi.OFF.new Text("", colorScheme);
-            }
-            current = current.plainString().isEmpty() ? option : current.concat(" ").concat(option);
-        }
-        if (!current.plainString().isEmpty())
-            result.add(current);
-        return result;
-    }
+        List<CommandLine.Model.PositionalParamSpec> positionals = cassandraPositionals(spec);
 
-    private Ansi.Text createCassandraSynopsisPositionalsText(Collection<CommandLine.Model.ArgSpec> done)
-    {
-        List<CommandLine.Model.PositionalParamSpec> positionals = cassandraPositionals(commandSpec());
-        positionals.removeAll(done);
-
-        Pair<String, String> commandArgumensSpec = findBackwardCompatibleArgument(commandSpec().userObject());
-        Ansi.Text text = colorScheme().text("");
+        Pair<String, String> commandArgumensSpec = findBackwardCompatibleArgument(spec.userObject());
+        Ansi.Text text = colorScheme.text("");
         // If the command has a backward compatible argument, use it to generate the synopsis based on the old format.
         if (commandArgumensSpec != null)
-            return colorScheme().parameterText(commandArgumensSpec.left);
+            return colorScheme.parameterText(commandArgumensSpec.left);
 
         IParamLabelRenderer parameterLabelRenderer = CassandraStyleParamLabelRender.create();
         for (CommandLine.Model.PositionalParamSpec positionalParam : positionals)
         {
-            Ansi.Text label = parameterLabelRenderer.renderParameterLabel(positionalParam, colorScheme().ansi(), colorScheme().parameterStyles());
+            Ansi.Text label = parameterLabelRenderer.renderParameterLabel(positionalParam, colorScheme.ansi(), colorScheme.parameterStyles());
             text = text.plainString().isEmpty() ? label : text.concat(" ").concat(label);
         }
         return text;
     }
 
-    private List<Ansi.Text> createCassandraSynopsisOptionsText(Collection<CommandLine.Model.ArgSpec> done)
+    private static List<CommandLine.Model.OptionSpec> parentCommandOptions(CommandLine.Model.CommandSpec commandSpec)
+    {
+        List<CommandLine.Model.CommandSpec> hierarhy = new LinkedList<>();
+        CommandLine.Model.CommandSpec curr;
+        while ((curr = commandSpec.parent()) != null)
+        {
+            hierarhy.add(curr);
+            commandSpec = curr;
+        }
+        Collections.reverse(hierarhy);
+        List<CommandLine.Model.OptionSpec> options = new ArrayList<>();
+        for (CommandLine.Model.CommandSpec spec : hierarhy)
+            options.addAll(spec.options());
+        return options;
+    }
+
+    private List<Ansi.Text> createCassandraSynopsisOptionsText(List<CommandLine.Model.OptionSpec> options)
     {
         // Cassandra uses alphabetical order for options, ordered by short name.
-        List<CommandLine.Model.OptionSpec> optionList = new ArrayList<>(commandSpec().options());
+        List<CommandLine.Model.OptionSpec> optionList = new ArrayList<>(options);
         optionList.sort(createShortOptionNameComparator());
         List<Ansi.Text> result = new ArrayList<>();
-        optionList.removeAll(done);
 
         ColorScheme colorScheme = colorScheme();
         IParamLabelRenderer parameterLabelRenderer = CassandraStyleParamLabelRender.create();
@@ -238,16 +222,25 @@ public class CassandraHelpLayout extends CommandLine.Help
                 continue;
 
             Ansi.Text text = ansi().new Text(0);
-            String nameString = option.shortestName();
-            Ansi.Text name = colorScheme.optionText(nameString);
-            Ansi.Text nameFull = colorScheme.optionText(option.longestName());
-            text = text.concat("[(")
-                       .concat(name)
-                       .concat(spacedParamLabel(option, parameterLabelRenderer, colorScheme))
-                       .concat(" | ")
-                       .concat(nameFull)
-                       .concat(spacedParamLabel(option, parameterLabelRenderer, colorScheme))
-                       .concat(")]");
+            String[] names = sortShortestFirst(option.names());
+            if (names.length == 1)
+            {
+                text = text.concat("[").concat(colorScheme.optionText(names[0]))
+                           .concat(spacedParamLabel(option, parameterLabelRenderer, colorScheme))
+                           .concat("]");
+            }
+            else
+            {
+                Ansi.Text shortName = colorScheme.optionText(option.shortestName());
+                Ansi.Text fullName = colorScheme.optionText(option.longestName());
+                text = text.concat("[(")
+                           .concat(shortName)
+                           .concat(spacedParamLabel(option, parameterLabelRenderer, colorScheme))
+                           .concat(" | ")
+                           .concat(fullName)
+                           .concat(spacedParamLabel(option, parameterLabelRenderer, colorScheme))
+                           .concat(")]");
+            }
 
             result.add(text);
         }
@@ -264,9 +257,8 @@ public class CassandraHelpLayout extends CommandLine.Help
     public String optionList()
     {
         Comparator<CommandLine.Model.OptionSpec> comparator = createShortOptionNameComparator();
-        List<CommandLine.Model.OptionSpec> optionList = commandSpec().options();
-
-        List<CommandLine.Model.OptionSpec> options = new ArrayList<>(optionList);
+        List<CommandLine.Model.OptionSpec> options = new LinkedList<>(parentCommandOptions(commandSpec()));
+        options.addAll(commandSpec().options());
         options.sort(comparator);
 
         Layout layout = cassandraSingleColumnOptionsParametersLayout();
@@ -275,7 +267,11 @@ public class CassandraHelpLayout extends CommandLine.Help
     }
 
     @Override
-    public String endOfOptionsList() {
+    public String endOfOptionsList()
+    {
+        List<CommandLine.Model.PositionalParamSpec> positionals = cassandraPositionals(commandSpec());
+        if (positionals.isEmpty())
+            return "";
         Layout layout = cassandraSingleColumnOptionsParametersLayout();
         layout.addOption(CASSANDRA_END_OF_OPTIONS_OPTION, CassandraStyleParamLabelRender.create());
         return layout.toString();
@@ -505,6 +501,57 @@ public class CassandraHelpLayout extends CommandLine.Help
             result[1] = new Ansi.Text[]{ descPadding.concat(scheme.parameterText(descriptionString)) };
             result[2] = new Ansi.Text[]{ Ansi.OFF.new Text("", scheme) };
             return result;
+        }
+    }
+
+    private static class LineBreakingLayout
+    {
+        private static final int spaceWidth = 1;
+        private final ColorScheme colorScheme;
+        private final int width;
+        private final int indentWrappedLines;
+        private final TextTable textTable;
+        /** Current line being built, always less than width. */
+        private Ansi.Text current;
+
+        public LineBreakingLayout(ColorScheme colorScheme, int width, TextTable textTable)
+        {
+            this.colorScheme = colorScheme;
+            this.width = width - textTable.columns()[0].indent;
+            this.indentWrappedLines = textTable.indentWrappedLines;
+            this.textTable = textTable;
+            current = colorScheme.text("");
+        }
+
+        public LineBreakingLayout concatItems(List<Ansi.Text> items)
+        {
+            for (Ansi.Text item : items)
+                concatItem(item);
+            return this;
+        }
+
+        public LineBreakingLayout concatItem(Ansi.Text item)
+        {
+            if (item.plainString().isEmpty())
+                return this;
+
+            if (current.plainString().length() + spaceWidth + item.plainString().length() >= width)
+            {
+                textTable.addRowValues(current);
+                current = colorScheme.text(leadingSpaces(indentWrappedLines)).concat(item);
+            }
+            else
+                current = current.plainString().length() == indentWrappedLines ?
+                          current.concat(item) :
+                          current.concat(" ").concat(item);
+            return this;
+        }
+
+        public void flush(Ansi.Text end)
+        {
+            textTable.addRowValues(current.plainString().length() == indentWrappedLines ?
+                                   end :
+                                   current.concat(" ").concat(end));
         }
     }
 }

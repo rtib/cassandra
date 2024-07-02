@@ -163,13 +163,10 @@ public class NodeToolV2
 
     private static CommandLine createCommandLine(CassandraCliFactory factory)
     {
-        CommandLine commandLine = new CommandLine(new TopLevelCommand(), factory);
-        JmxConnectionMixin mixin = factory.create(JmxConnectionMixin.class);
-        commandLine.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin);
-        commandLine.getSubcommands().values().forEach(sub -> sub.addMixin(JmxConnectionMixin.MIXIN_KEY, mixin));
-        commandLine.setOut(new PrintWriter(factory.output.out, true));
-        commandLine.setErr(new PrintWriter(factory.output.err, true));
-        return commandLine;
+        return new CommandLine(new TopLevelCommand(), factory)
+                   .addMixin(JmxConnectionMixin.MIXIN_KEY, factory.create(JmxConnectionMixin.class))
+                   .setOut(new PrintWriter(factory.output.out, true))
+                   .setErr(new PrintWriter(factory.output.err, true));
     }
 
     private static void configureCliLayout(CommandLine commandLine)

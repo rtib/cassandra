@@ -32,15 +32,15 @@ public class AbortBootstrap extends BaseCommand
     public String nodeId = EMPTY;
 
     @Option(names = "--ip", description = "IP of the node that failed bootstrap")
-    public String endpoint = EMPTY;
+    public String ip = EMPTY;
 
     @Override
     public void execute(ServiceMBeanBridge probe)
     {
-        if (isEmpty(nodeId) && isEmpty(endpoint))
+        if (isEmpty(nodeId) && isEmpty(ip))
             throw new IllegalArgumentException("Either --node or --ip needs to be set");
-        if (!isEmpty(nodeId) && !isEmpty(endpoint))
+        if (!isEmpty(nodeId) && !isEmpty(ip))
             throw new IllegalArgumentException("Only one of --node or --ip need to be set");
-        probe.ssProxy().abortBootstrap(nodeId, endpoint);
+        probe.ssProxy().abortBootstrap(nodeId, ip);
     }
 }
