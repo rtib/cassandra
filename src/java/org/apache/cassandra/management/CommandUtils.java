@@ -56,9 +56,9 @@ public final class CommandUtils
         Class<?> clazz = userObject.getClass();
         for (Field field : clazz.getFields())
         {
-            if (field.isAnnotationPresent(CassandraCliArgument.class))
+            if (field.isAnnotationPresent(ParameterUsage.class))
             {
-                CassandraCliArgument ann = field.getAnnotation(CassandraCliArgument.class);
+                ParameterUsage ann = field.getAnnotation(ParameterUsage.class);
                 return Pair.create(ann.usage(), ann.description());
             }
         }

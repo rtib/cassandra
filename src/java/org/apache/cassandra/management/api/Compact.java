@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.CassandraCliArgument;
+import org.apache.cassandra.management.ParameterUsage;
 import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 
@@ -32,7 +32,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 @CommandLine.Command(name = "compact", description = "Force a (major) compaction on one or more tables or user-defined compaction on given SSTables")
 public class Compact extends BaseCommand
 {
-    @CassandraCliArgument(usage = "[<keyspace> <tables>...] or <SSTable file>...",
+    @ParameterUsage(usage = "[<keyspace> <tables>...] or <SSTable file>...",
         description = "The keyspace followed by one or many tables or list of SSTable data files when using --user-defined")
     @CommandLine.Parameters(index = "0..*", description = "The keyspace followed by one or many tables or " +
                                                           "list of SSTable data files when using --user-defined")

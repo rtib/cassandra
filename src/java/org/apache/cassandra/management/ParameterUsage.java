@@ -24,12 +24,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Argument annotation for Cassandra commands, used to provide metadata
- * for command-line argument for backward compatibility purposes.
+ * Argument annotation for Cassandra commands, used to provide a message
+ * for command-line argument for backward compatibility when help is requested.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD })
-public @interface CassandraCliArgument
+public @interface ParameterUsage
 {
     String description() default "";
     String usage() default "";

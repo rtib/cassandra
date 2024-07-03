@@ -23,7 +23,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 
 import org.apache.cassandra.management.BaseCommand;
-import org.apache.cassandra.management.CassandraCliArgument;
+import org.apache.cassandra.management.ParameterUsage;
 import org.apache.cassandra.management.ServiceMBeanBridge;
 import picocli.CommandLine;
 
@@ -33,7 +33,7 @@ import static org.apache.cassandra.tools.NodeTool.NodeToolCmd.parsePartitionKeys
 @CommandLine.Command(name = "forcecompact", description = "Force a (major) compaction on a table")
 public class ForceCompact extends BaseCommand
 {
-    @CassandraCliArgument(usage = "[<keyspace> <table> <keys>]",
+    @ParameterUsage(usage = "[<keyspace> <table> <keys>]",
                           description = "The keyspace, table, and a list of partition keys ignoring the gc_grace_seconds")
     public List<String> args;
 
