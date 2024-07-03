@@ -20,8 +20,6 @@ package org.apache.cassandra.management.api;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.common.collect.Lists;
-
 import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.CassandraCliArgument;
 import org.apache.cassandra.management.ServiceMBeanBridge;
@@ -36,48 +34,32 @@ public class Compact extends BaseCommand
 {
     @CassandraCliArgument(usage = "[<keyspace> <tables>...] or <SSTable file>...",
         description = "The keyspace followed by one or many tables or list of SSTable data files when using --user-defined")
+    @CommandLine.Parameters(index = "0..*", description = "The keyspace followed by one or many tables or " +
+                                                          "list of SSTable data files when using --user-defined")
     public List<String> args = new ArrayList<>();
-    @CommandLine.ArgGroup
-    public TablesArgs tablesArgs = new TablesArgs();
-    @CommandLine.ArgGroup
-    public UserDefinedArgs userDefinedArgs = new UserDefinedArgs();
 
-    public static class TablesArgs
-    {
-        @CommandLine.Option(names = { "-st", "--start-token"},
-            description = "Use -st to specify a token at which the compaction range starts (inclusive)")
-        public String startToken = EMPTY;
-        @CommandLine.Option(names = { "-et", "--end-token"},
-            description = "Use -et to specify a token at which compaction range ends (inclusive)")
-        public String endToken = EMPTY;
-        @CommandLine.Option(names = { "--partition"},
-            description = "String representation of the partition key")
-        public String partitionKey = EMPTY;
-        @CommandLine.Parameters(index = "0", arity = "1", description = "The keyspace followed by one or many tables")
-        public String keyspace;
-        @CommandLine.Parameters(index = "1..*", arity = "1", description = "The tables to be compacted")
-        public String[] tables;
-    }
-
-    public static class UserDefinedArgs
-    {
-        @CommandLine.Option(names = { "--user-defined" }, description = "Use --user-defined to submit listed files for user-defined compaction")
-        public boolean userDefined = false;
-        @CommandLine.Parameters(index = "0..*", arity = "1", description = "The SSTable files to be compacted")
-        public String[] sstableFiles;
-    }
-
-    @CommandLine.Option(names = { "-s", "--split-output"}, description = "Use -s to not create a single big file")
+    @CommandLine.Option(names = { "-s", "--split-output" }, description = "Use -s to not create a single big file")
     public boolean splitOutput = false;
+
+    @CommandLine.Option(names = { "--user-defined" },
+        description = "Use --user-defined to submit listed files for user-defined compaction")
+    public boolean userDefined = false;
+
+    @CommandLine.Option(names = { "-st", "--start-token" },
+        description = "Use -st to specify a token at which the compaction range starts (inclusive)")
+    public String startToken = EMPTY;
+
+    @CommandLine.Option(names = { "-et", "--end-token" },
+        description = "Use -et to specify a token at which compaction range ends (inclusive)")
+    public String endToken = EMPTY;
+
+    @CommandLine.Option(names = { "--partition" },
+        description = "String representation of the partition key")
+    public String partitionKey = EMPTY;
 
     @Override
     public void execute(ServiceMBeanBridge probe)
     {
-        final boolean userDefined = userDefinedArgs.userDefined;
-        final String startToken = tablesArgs.startToken;
-        final String endToken = tablesArgs.endToken;
-        final String partitionKey = tablesArgs.partitionKey;
-        args = userDefined ? List.of(userDefinedArgs.sstableFiles) : Lists.asList(tablesArgs.keyspace, tablesArgs.tables);
         final boolean startEndTokenProvided = !(startToken.isEmpty() && endToken.isEmpty());
         final boolean partitionKeyProvided = !partitionKey.isEmpty();
         final boolean tokenProvided = startEndTokenProvided || partitionKeyProvided;
@@ -96,7 +78,9 @@ public class Compact extends BaseCommand
             {
                 String userDefinedFiles = String.join(",", args);
                 probe.cmProxy().forceUserDefinedCompaction(userDefinedFiles);
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 throw new RuntimeException("Error occurred during user defined compaction", e);
             }
             return;
@@ -121,7 +105,8 @@ public class Compact extends BaseCommand
                 {
                     probe.ssProxy().forceKeyspaceCompaction(splitOutput, keyspace, tableNames);
                 }
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 throw new RuntimeException("Error occurred during compaction", e);
             }
