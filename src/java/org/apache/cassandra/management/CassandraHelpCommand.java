@@ -19,11 +19,22 @@
 package org.apache.cassandra.management;
 
 import java.io.PrintWriter;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
 
 import picocli.CommandLine;
+
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_COMMAND_LIST_HEADING;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_EXIT_CODE_LIST;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_EXIT_CODE_LIST_HEADING;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_FOOTER;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_FOOTER_HEADING;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_HEADER;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_HEADER_HEADING;
+import static picocli.CommandLine.Model.UsageMessageSpec.SECTION_KEY_SYNOPSIS;
 
 @CommandLine.Command(name = "help",
     header = "Display help information about the specified command.",
@@ -91,7 +102,7 @@ public class CassandraHelpCommand implements CommandLine.IHelpCommandInitializab
             return;
         }
 
-        Map<String, CommandLine.IHelpSectionRenderer> helpSectionMap = CassandraHelpLayout.cassandraTopLevelHelpSectionKeys((CassandraHelpLayout) help);
+        Map<String, CommandLine.IHelpSectionRenderer> helpSectionMap = cassandraTopLevelHelpSectionKeys((CassandraHelpLayout) help);
         for (String key : command.getHelpSectionKeys())
         {
             CommandLine.IHelpSectionRenderer renderer = helpSectionMap.get(key);
@@ -102,6 +113,27 @@ public class CassandraHelpCommand implements CommandLine.IHelpCommandInitializab
 
         writer.println(sb);
         writer.flush();
+    }
+
+    /**
+     * Top-level help command (includes all the available nodetool commands) has a different layout, so we need to
+     * provide a different set of keys for the help sections.
+     * @param layout The help class layout.
+     * @return Map of supported keys for the help sections.
+     */
+    public static Map<String, CommandLine.IHelpSectionRenderer> cassandraTopLevelHelpSectionKeys(CassandraHelpLayout layout)
+    {
+        Map<String, CommandLine.IHelpSectionRenderer> sectionMap = new LinkedHashMap<>();
+        sectionMap.put(SECTION_KEY_HEADER_HEADING, CommandLine.Help::headerHeading);
+        sectionMap.put(SECTION_KEY_HEADER, CommandLine.Help::header);
+        sectionMap.put(SECTION_KEY_SYNOPSIS, layout::topLevelSynopsis);
+        sectionMap.put(SECTION_KEY_COMMAND_LIST_HEADING, layout::topLevelCommandListHeading);
+        sectionMap.put(SECTION_KEY_COMMAND_LIST, CommandLine.Help::commandList);
+        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST_HEADING, CommandLine.Help::exitCodeListHeading);
+        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST, CommandLine.Help::exitCodeList);
+        sectionMap.put(SECTION_KEY_FOOTER_HEADING, CommandLine.Help::footerHeading);
+        sectionMap.put(SECTION_KEY_FOOTER, CommandLine.Help::footer);
+        return sectionMap;
     }
 
     /**

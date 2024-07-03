@@ -21,7 +21,6 @@ package org.apache.cassandra.management;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +60,7 @@ public class CassandraHelpLayout extends CommandLine.Help
     private static final String DESCRIPTION_HEADING = "NAME%n";
     private static final String SYNOPSIS_HEADING = "SYNOPSIS%n";
     private static final String OPTIONS_HEADING = "OPTIONS%n";
+    private static final String FOOTER_HEADING = "%n";
     private static final int DESCRIPTION_INDENT = 4;
     public static final int COLUMN_INDENT = 8;
     public static final int SUBCOMMANDS_INDENT = 4;
@@ -75,6 +75,7 @@ public class CassandraHelpLayout extends CommandLine.Help
     public static final String TOP_LEVEL_COMMAND_HEADING = "The most commonly used nodetool commands are:";
     public static final String USAGE_HELP_FOOTER = "See 'nodetool help <command>' for more information on a specific command.";
     public static final String SYNOPSIS_SUBCOMMANDS_LABEL = "<command> [<args>]";
+    private static final String[] EMPTY_FOOTER = new String[0];
 
     public CassandraHelpLayout(CommandLine.Model.CommandSpec spec, ColorScheme scheme)
     {
@@ -296,10 +297,11 @@ public class CassandraHelpLayout extends CommandLine.Help
     {
         Pair<String, String> cassandraArgument = findBackwardCompatibleArgument(commandSpec().userObject());
         List<CommandLine.Model.PositionalParamSpec> positionalParams = cassandraPositionals(commandSpec());
+        TextTable table = configureLayoutTextTable();
         Layout layout = cassandraArgument == null ?
                         cassandraSingleColumnOptionsParametersLayout() :
                         new Layout(colorScheme(),
-                                   configureLayoutTextTable(),
+                                   table,
                                    new CassandraStyleOptionRenderer(),
                                    new CassandraStyleParameterRenderer())
                         {
@@ -325,6 +327,7 @@ public class CassandraHelpLayout extends CommandLine.Help
                         };
 
         layout.addAllPositionalParameters(positionalParams, CassandraStyleParamLabelRender.create());
+        table.addEmptyRow();
         return layout.toString();
     }
 
@@ -356,21 +359,33 @@ public class CassandraHelpLayout extends CommandLine.Help
     }
 
     @Override
+    public String footerHeading(Object... params)
+    {
+        return createHeading(FOOTER_HEADING, params);
+    }
+
+    @Override
     public String footer(Object... params)
     {
-        String[] footer = isEmpty(commandSpec().usageMessage().footer()) ? new String[]{ USAGE_HELP_FOOTER } :
-                          commandSpec().usageMessage().footer();
-        StringBuilder sb = new StringBuilder();
-        TextTable table = TextTable.forColumnWidths(ansi(), commandSpec().usageMessage().width());
+        String[] footer;
+        if (commandSpec().parent() == null)
+            footer = isEmpty(commandSpec().usageMessage().footer()) ? new String[]{ USAGE_HELP_FOOTER } :
+                     commandSpec().usageMessage().footer();
+        else
+            footer = EMPTY_FOOTER;
+
+        TextTable table = TextTable.forColumns(colorScheme(), new Column(commandSpec().usageMessage().width(), 0, Column.Overflow.WRAP));
         table.setAdjustLineBreaksForWideCJKCharacters(commandSpec().usageMessage().adjustLineBreaksForWideCJKCharacters());
         table.indentWrappedLines = 0;
+
         for (String summaryLine : footer)
             table.addRowValues(String.format(summaryLine, params));
-        table.toString(sb);
+        table.addEmptyRow();
         return table.toString();
     }
 
-    public String topLevelCommandListHeading(Object... params) {
+    public String topLevelCommandListHeading(Object... params)
+    {
         return createHeading(TOP_LEVEL_COMMAND_HEADING + "%n", params);
     }
 
@@ -411,27 +426,6 @@ public class CassandraHelpLayout extends CommandLine.Help
         result.add(SECTION_KEY_FOOTER_HEADING);
         result.add(SECTION_KEY_FOOTER);
         return result;
-    }
-
-    /**
-     * Top-level help command (includes all the available nodetool commands) has a different layout, so we need to
-     * provide a different set of keys for the help sections.
-     * @param layout The help class layout.
-     * @return Map of supported keys for the help sections.
-     */
-    public static Map<String, CommandLine.IHelpSectionRenderer> cassandraTopLevelHelpSectionKeys(CassandraHelpLayout layout)
-    {
-        Map<String, CommandLine.IHelpSectionRenderer> sectionMap = new LinkedHashMap<>();
-        sectionMap.put(SECTION_KEY_HEADER_HEADING, CommandLine.Help::headerHeading);
-        sectionMap.put(SECTION_KEY_HEADER, CommandLine.Help::header);
-        sectionMap.put(SECTION_KEY_SYNOPSIS, layout::topLevelSynopsis);
-        sectionMap.put(SECTION_KEY_COMMAND_LIST_HEADING, layout::topLevelCommandListHeading);
-        sectionMap.put(SECTION_KEY_COMMAND_LIST, CommandLine.Help::commandList);
-        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST_HEADING, CommandLine.Help::exitCodeListHeading);
-        sectionMap.put(SECTION_KEY_EXIT_CODE_LIST, CommandLine.Help::exitCodeList);
-        sectionMap.put(SECTION_KEY_FOOTER_HEADING, CommandLine.Help::footerHeading);
-        sectionMap.put(SECTION_KEY_FOOTER, CommandLine.Help::footer);
-        return sectionMap;
     }
 
     private static Ansi.Text spacedParamLabel(CommandLine.Model.OptionSpec optionSpec,
@@ -507,18 +501,16 @@ public class CassandraHelpLayout extends CommandLine.Help
     private static class LineBreakingLayout
     {
         private static final int spaceWidth = 1;
-        private final ColorScheme colorScheme;
         private final int width;
-        private final int indentWrappedLines;
         private final TextTable textTable;
+        private final Ansi.Text padding;
         /** Current line being built, always less than width. */
         private Ansi.Text current;
 
         public LineBreakingLayout(ColorScheme colorScheme, int width, TextTable textTable)
         {
-            this.colorScheme = colorScheme;
             this.width = width - textTable.columns()[0].indent;
-            this.indentWrappedLines = textTable.indentWrappedLines;
+            this.padding = colorScheme.text(leadingSpaces(textTable.indentWrappedLines));
             this.textTable = textTable;
             current = colorScheme.text("");
         }
@@ -538,10 +530,10 @@ public class CassandraHelpLayout extends CommandLine.Help
             if (current.plainString().length() + spaceWidth + item.plainString().length() >= width)
             {
                 textTable.addRowValues(current);
-                current = colorScheme.text(leadingSpaces(indentWrappedLines)).concat(item);
+                current = padding.concat(item);
             }
             else
-                current = current.plainString().length() == indentWrappedLines ?
+                current = current == padding || current.plainString().isEmpty() ?
                           current.concat(item) :
                           current.concat(" ").concat(item);
             return this;
@@ -549,9 +541,7 @@ public class CassandraHelpLayout extends CommandLine.Help
 
         public void flush(Ansi.Text end)
         {
-            textTable.addRowValues(current.plainString().length() == indentWrappedLines ?
-                                   end :
-                                   current.concat(" ").concat(end));
+            textTable.addRowValues(current == padding ? end : current.concat(" ").concat(end));
         }
     }
 }

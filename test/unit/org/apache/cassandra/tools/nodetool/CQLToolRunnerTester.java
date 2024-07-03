@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.tools.nodetool;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -40,8 +41,8 @@ import org.apache.cassandra.tools.ToolRunner;
 public abstract class CQLToolRunnerTester extends CQLTester
 {
     public static final Map<String, ToolHandler> runnersMap = Map.of(
-        "invokeNodetoolInJvmV1", CQLToolRunnerTester::invokeNodetoolInJvmV1,
-        "invokeNodetoolInJvmV2", CQLToolRunnerTester::invokeNodetoolInJvmV2);
+        "invokeNodetoolV1InJvm", CQLToolRunnerTester::invokeNodetoolV1InJvm,
+        "invokeNodetoolV2InJvm", CQLToolRunnerTester::invokeNodetoolV2InJvm);
 
     @Parameterized.Parameter
     public String runner;
@@ -73,12 +74,12 @@ public abstract class CQLToolRunnerTester extends CQLTester
         return runnersMap.get(runner).execute(args);
     }
 
-    public static ToolRunner.ToolResult invokeNodetoolInJvmV2(String... commands)
+    public static ToolRunner.ToolResult invokeNodetoolV2InJvm(String... commands)
     {
         return ToolRunner.invokeNodetoolInJvm(NodeToolV2::new, commands);
     }
 
-    public static ToolRunner.ToolResult invokeNodetoolInJvmV1(String... commands)
+    public static ToolRunner.ToolResult invokeNodetoolV1InJvm(String... commands)
     {
         return ToolRunner.invokeNodetoolInJvm(NodeTool::new, commands);
     }
@@ -102,7 +103,7 @@ public abstract class CQLToolRunnerTester extends CQLTester
     {
         return '\n' + ">> source <<" + '\n' +
                printFormattedNodeToolOutput(stdoutOrig) +
-               '\n' + ">> target <<" +
+               '\n' + ">> result <<" +
                '\n' + printFormattedNodeToolOutput(stdoutNew) +
                '\n' + " difference for \"" + commandName + "\":" + diff;
     }
@@ -110,9 +111,10 @@ public abstract class CQLToolRunnerTester extends CQLTester
     protected static String printFormattedNodeToolOutput(List<String> output)
     {
         StringBuilder sb = new StringBuilder();
+        DecimalFormat df = new DecimalFormat("000");
         for(int i = 0; i < output.size(); i++)
         {
-            sb.append(i).append(':').append(output.get(i));
+            sb.append(df.format(i)).append(':').append(output.get(i));
             if(i < output.size() - 1)
                 sb.append('\n');
         }
@@ -128,7 +130,7 @@ public abstract class CQLToolRunnerTester extends CQLTester
                 diffLines.add(delta.getType().toString().toLowerCase() + " source: " + line);
             }
             for (String line : delta.getTarget().getLines()) {
-                diffLines.add(delta.getType().toString().toLowerCase() + " target: " + line);
+                diffLines.add(delta.getType().toString().toLowerCase() + " result: " + line);
             }
         }
 

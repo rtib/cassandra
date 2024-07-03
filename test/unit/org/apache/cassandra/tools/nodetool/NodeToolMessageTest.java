@@ -30,8 +30,8 @@ public class NodeToolMessageTest extends CQLToolRunnerTester
     @Test
     public void testCompareHelpCommand()
     {
-        List<String> outNodeTool = sliceStdout(invokeNodetoolInJvmV1("help"));
-        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolInJvmV2("help"));
+        List<String> outNodeTool = sliceStdout(invokeNodetoolV1InJvm("help"));
+        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolV2InJvm("help"));
 
         String diff = computeDiff(outNodeTool, outNodeToolV2);
         assertTrue(printFormattedDiffsMessage(outNodeTool, outNodeToolV2, "help", diff),
@@ -41,7 +41,7 @@ public class NodeToolMessageTest extends CQLToolRunnerTester
     @Test
     public void testBaseCommandOutput()
     {
-        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolInJvmV1());
+        List<String> outNodeToolV2 = sliceStdout(invokeNodetoolV1InJvm("help", "abortbootstrap"));
         System.out.println(printFormattedNodeToolOutput(outNodeToolV2));
     }
 }

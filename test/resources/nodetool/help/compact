@@ -1,19 +1,19 @@
 NAME
-        nodetool compact - Force a (major) compaction on one or more tables or
-        user-defined compaction on given SSTables
+        nodetool compact - Force a (major) compaction on one or more tables
+        or user-defined compaction on given SSTables
 
 SYNOPSIS
         nodetool [(-h <host> | --host <host>)] [(-p <port> | --port <port>)]
                 [(-pp | --print-port)] [(-pw <password> | --password <password>)]
                 [(-pwf <passwordFilePath> | --password-file <passwordFilePath>)]
                 [(-u <username> | --username <username>)] compact
-                [(-et <end_token> | --end-token <end_token>)]
-                [--partition <partition_key>] [(-s | --split-output)]
-                [(-st <start_token> | --start-token <start_token>)] [--user-defined]
+                [(-et <endToken> | --end-token <endToken>)]
+                [--partition <partitionKey>] [(-s | --split-output)]
+                [(-st <startToken> | --start-token <startToken>)] [--user-defined]
                 [--] [<keyspace> <tables>...] or <SSTable file>...
 
 OPTIONS
-        -et <end_token>, --end-token <end_token>
+        -et <endToken>, --end-token <endToken>
             Use -et to specify a token at which compaction range ends
             (inclusive)
 
@@ -23,7 +23,7 @@ OPTIONS
         -p <port>, --port <port>
             Remote jmx agent port number
 
-        --partition <partition_key>
+        --partition <partitionKey>
             String representation of the partition key
 
         -pp, --print-port
@@ -38,7 +38,7 @@ OPTIONS
         -s, --split-output
             Use -s to not create a single big file
 
-        -st <start_token>, --start-token <start_token>
+        -st <startToken>, --start-token <startToken>
             Use -st to specify a token at which the compaction range starts
             (inclusive)
 
@@ -50,11 +50,10 @@ OPTIONS
             compaction
 
         --
-            This option can be used to separate command-line options from the
-            list of argument, (useful when arguments might be mistaken for
-            command-line options
+            This option can be used to separate command-line options from
+            the list of argument, (useful when arguments might be mistaken
+            for command-line options
 
         [<keyspace> <tables>...] or <SSTable file>...
-            The keyspace followed by one or many tables or list of SSTable data
-            files when using --user-defined
-
+            The keyspace followed by one or many tables or list of SSTable
+            data files when using --user-defined

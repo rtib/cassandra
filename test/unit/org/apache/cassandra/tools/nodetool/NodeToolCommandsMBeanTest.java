@@ -57,7 +57,7 @@ public class NodeToolCommandsMBeanTest extends CQLToolRunnerTester
     }
 
     @Test
-    public void testAssassinate() throws Throwable
+    public void testAssassinate()
     {
         String ip = "10.20.113.11";
         StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
@@ -67,7 +67,7 @@ public class NodeToolCommandsMBeanTest extends CQLToolRunnerTester
     }
 
     @Test
-    public void testAbortBootstrap() throws Throwable
+    public void testAbortBootstrap()
     {
         String nodeId = "1";
         String ip = "10.20.113.11";
@@ -79,7 +79,7 @@ public class NodeToolCommandsMBeanTest extends CQLToolRunnerTester
     }
 
     @Test
-    public void testForceKeyspaceCompactionForPartitionKey() throws Throwable
+    public void testCompactForceKeyspaceCompactionForPartitionKey() throws Throwable
     {
         long token = 42;
         long key = Murmur3Partitioner.LongToken.keyForToken(token).getLong();
@@ -89,6 +89,41 @@ public class NodeToolCommandsMBeanTest extends CQLToolRunnerTester
         when(mock.getNonSystemKeyspaces()).thenReturn(List.of(keyspace()));
         invokeNodetool("compact", "--partition", Long.toString(key), keyspace(), table).assertOnCleanExit();
         Mockito.verify(mock).forceKeyspaceCompactionForPartitionKey(keyspace(), Long.toString(key), table);
+    }
+
+    @Test
+    public void testCompactForceKeyspaceCompactionForTokenRange() throws Throwable
+    {
+        long token = 11;
+        long key = Murmur3Partitioner.LongToken.keyForToken(token).getLong();
+        String startToken = Long.toString(key - 1);
+        String endToken = Long.toString(key + 1);
+        String table = "table";
+        StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
+        when(mock.getKeyspaces()).thenReturn(List.of(keyspace()));
+        when(mock.getNonSystemKeyspaces()).thenReturn(List.of(keyspace()));
+        invokeNodetool("compact", "--start-token", startToken, "--end-token", endToken, keyspace(), table).assertOnCleanExit();
+        Mockito.verify(mock).forceKeyspaceCompactionForTokenRange(keyspace(), startToken, endToken, table);
+    }
+
+    @Test
+    public void testCompactForceKeyspaceCompaction() throws Throwable
+    {
+        String table = "table";
+        StorageServiceMBean mock = mbeanMockHodler.getMock(STORAGE_SERVICE_MBEAN);
+        when(mock.getKeyspaces()).thenReturn(List.of(keyspace()));
+        when(mock.getNonSystemKeyspaces()).thenReturn(List.of(keyspace()));
+        invokeNodetool("compact", "--split-output", keyspace(), table).assertOnCleanExit();
+        Mockito.verify(mock).forceKeyspaceCompaction(true, keyspace(), table);
+    }
+
+    @Test
+    public void testCompactForceUserDefinedCompaction() throws Throwable
+    {
+        String[] ssTables = new String[] { "ssTable1", "ssTable2" };
+        CompactionManagerMBean mock = mbeanMockHodler.getMock(COMPACTION_MANAGER_MBEAN);
+        invokeNodetool("compact", "--user-defined", ssTables[0], ssTables[1]).assertOnCleanExit();
+        Mockito.verify(mock).forceUserDefinedCompaction(String.join(",", ssTables));
     }
 
     private static class MBeanMockHodler
