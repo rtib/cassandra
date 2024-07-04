@@ -196,19 +196,24 @@ public class NodeToolV2
         {
             try
             {
-                Object bean = this.fallback.create(cls);
-                Field[] fields = bean.getClass().getDeclaredFields();
-                for (Field field : fields)
+                K bean = this.fallback.create(cls);
+                Class<?> beanClass = bean.getClass();
+                do
                 {
-                    if (!field.isAnnotationPresent(Inject.class))
-                        continue;
-                    field.setAccessible(true);
-                    if (field.getType().equals(INodeProbeFactory.class))
-                        field.set(bean, nodeProbeFactory);
-                    else if (field.getType().equals(Output.class))
-                        field.set(bean, output);
+                    Field[] fields = beanClass.getDeclaredFields();
+                    for (Field field : fields)
+                    {
+                        if (!field.isAnnotationPresent(Inject.class))
+                            continue;
+                        field.setAccessible(true);
+                        if (field.getType().equals(INodeProbeFactory.class))
+                            field.set(bean, nodeProbeFactory);
+                        else if (field.getType().equals(Output.class))
+                            field.set(bean, output);
+                    }
                 }
-                return (K) bean;
+                while ((beanClass = beanClass.getSuperclass()) != null);
+                return bean;
             }
             catch (Exception e)
             {

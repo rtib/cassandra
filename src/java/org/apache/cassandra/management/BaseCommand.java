@@ -18,11 +18,18 @@
 
 package org.apache.cassandra.management;
 
+import javax.inject.Inject;
+
+import org.apache.cassandra.tools.Output;
+
 /**
  * Base class for all nodetool commands.
  */
 public abstract class BaseCommand implements Runnable
 {
+    @Inject
+    protected Output logger;
+
     /** The ServiceBridge instance to interact with the Cassandra node. */
     protected ServiceMBeanBridge bridge;
 

@@ -32,4 +32,14 @@ public class Output
         this.out = out;
         this.err = err;
     }
+
+    public void info(String msg, Object... args)
+    {
+        out.printf(msg, args);
+    }
+
+    public void error(String msg, Object... args)
+    {
+        err.printf(msg, args);
+    }
 }

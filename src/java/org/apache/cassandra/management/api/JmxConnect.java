@@ -26,7 +26,6 @@ import com.google.common.base.Throwables;
 import org.apache.cassandra.management.BaseCommand;
 import org.apache.cassandra.management.ServiceMBeanBridge;
 import org.apache.cassandra.tools.INodeProbeFactory;
-import org.apache.cassandra.tools.Output;
 import picocli.CommandLine;
 
 import static java.lang.Integer.parseInt;
@@ -69,8 +68,6 @@ public class JmxConnect extends BaseCommand implements AutoCloseable
 
     @Inject
     private INodeProbeFactory nodeProbeFactory;
-    @Inject
-    private Output output;
 
     /**
      * This method is called by picocli and used depending on the execution strategy.
@@ -92,7 +89,7 @@ public class JmxConnect extends BaseCommand implements AutoCloseable
             jmx.commandLine()
                .getErr()
                .println("Failed to connect to JMX: " + e.getMessage());
-            return CommandLine.ExitCode.SOFTWARE;
+            return jmx.commandLine().getExitCodeExceptionMapper().getExitCode(e);
         }
     }
 
@@ -119,7 +116,7 @@ public class JmxConnect extends BaseCommand implements AutoCloseable
         catch (IOException | SecurityException e)
         {
             Throwable rootCause = Throwables.getRootCause(e);
-            output.err.printf("nodetool: Failed to connect to '%s:%s' - %s: '%s'.%n", host, port,
+            logger.error("nodetool: Failed to connect to '%s:%s' - %s: '%s'.%n", host, port,
                               rootCause.getClass().getSimpleName(), rootCause.getMessage());
             throw new CommandLine.ExecutionException(spec.commandLine(), "Failed to connect to JMX", e);
         }

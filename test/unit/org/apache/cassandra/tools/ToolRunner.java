@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -318,8 +319,8 @@ public class ToolRunner
 
     public static ToolRunner.ToolResult invokeNodetoolInJvm(BiFunction<INodeProbeFactory, Output, Object> factory, String... commands)
     {
-        ListOutputStream out = new ListOutputStream();
-        ListOutputStream err = new ListOutputStream();
+        LinesOutputStream out = new LinesOutputStream(logger::info);
+        LinesOutputStream err = new LinesOutputStream(logger::error);
         List<String> args = CQLTester.buildNodetoolArgs(isEmpty(commands) ? new ArrayList<>() : List.of(commands));
         args.remove("bin/nodetool");
         try
@@ -772,10 +773,16 @@ public class ToolRunner
         }
     }
 
-    private static class ListOutputStream extends OutputStream
+    private static class LinesOutputStream extends OutputStream
     {
         private final List<String> outputLines = new ArrayList<>();
         private final StringBuilder buffer = new StringBuilder();
+        private final Consumer<String> logger;
+
+        public LinesOutputStream(Consumer<String> logger)
+        {
+            this.logger = logger;
+        }
 
         @Override
         public void write(int b)
@@ -785,6 +792,7 @@ public class ToolRunner
             {
                 // Add the buffer to the list if it's a new line
                 outputLines.add(buffer.toString());
+                logger.accept(buffer.toString());
                 buffer.setLength(0); // Clear the buffer
             }
             else
@@ -796,6 +804,7 @@ public class ToolRunner
             if (buffer.length() > 0)
             {
                 outputLines.add(buffer.toString());
+                logger.accept(buffer.toString());
                 buffer.setLength(0);
             }
         }
