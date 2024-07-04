@@ -18,16 +18,11 @@
 
 package org.apache.cassandra.management;
 
-import picocli.CommandLine;
-
 /**
  * Base class for all nodetool commands.
  */
 public abstract class BaseCommand implements Runnable
 {
-    /** The command specification, used to access command-specific properties. */
-    @CommandLine.Spec
-    protected CommandLine.Model.CommandSpec spec; // injected by picocli
     /** The ServiceBridge instance to interact with the Cassandra node. */
     protected ServiceMBeanBridge bridge;
 
@@ -39,6 +34,15 @@ public abstract class BaseCommand implements Runnable
     public void setBridge(ServiceMBeanBridge bridge)
     {
         this.bridge = bridge;
+    }
+
+    /**
+     * Returns the ServiceBridge instance used to interact with the Cassandra node.
+     * @return The ServiceBridge instance.
+     */
+    public ServiceMBeanBridge getBridge()
+    {
+        return bridge;
     }
 
     @Override

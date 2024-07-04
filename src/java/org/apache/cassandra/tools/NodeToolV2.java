@@ -29,7 +29,7 @@ import com.google.common.base.Throwables;
 
 import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.management.CassandraHelpLayout;
-import org.apache.cassandra.management.api.JmxConnectionMixin;
+import org.apache.cassandra.management.api.JmxConnect;
 import org.apache.cassandra.management.api.TopLevelCommand;
 import org.apache.cassandra.utils.FBUtilities;
 import picocli.CommandLine;
@@ -85,7 +85,7 @@ public class NodeToolV2
         try
         {
             configureCliLayout(commandLine);
-            commandLine.setExecutionStrategy(strategy == null ? JmxConnectionMixin::executionStrategy : strategy)
+            commandLine.setExecutionStrategy(strategy == null ? JmxConnect::executionStrategy : strategy)
                        .setExecutionExceptionHandler(executionExceptionHandler)
                        .setParameterExceptionHandler(parameterExceptionHandler);
 
@@ -111,7 +111,7 @@ public class NodeToolV2
             CommandLine.Model.CommandSpec spec = lastExecutableSubcommandWithSameParent(parsed.asCommandLineList());
             if (commandPredicate.test(spec.name()))
                 return exitCodeWhenMatched;
-            return JmxConnectionMixin.executionStrategy(parsed);
+            return JmxConnect.executionStrategy(parsed);
         };
         return this;
     }
@@ -164,7 +164,7 @@ public class NodeToolV2
     private static CommandLine createCommandLine(CassandraCliFactory factory)
     {
         return new CommandLine(new TopLevelCommand(), factory)
-                   .addMixin(JmxConnectionMixin.MIXIN_KEY, factory.create(JmxConnectionMixin.class))
+                   .addMixin(JmxConnect.MIXIN_KEY, factory.create(JmxConnect.class))
                    .setOut(new PrintWriter(factory.output.out, true))
                    .setErr(new PrintWriter(factory.output.err, true));
     }

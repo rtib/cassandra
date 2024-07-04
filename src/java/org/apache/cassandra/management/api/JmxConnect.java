@@ -41,9 +41,13 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
  * Command options for NodeTool commands that are executed via JMX.
  */
 @CommandLine.Command(name = "connect", description = "Connect to a Cassandra node via JMX")
-public class JmxConnectionMixin
+public class JmxConnect extends BaseCommand implements AutoCloseable
 {
     public static final String MIXIN_KEY = "jmx";
+
+    /** The command specification, used to access command-specific properties. */
+    @CommandLine.Spec
+    protected CommandLine.Model.CommandSpec spec; // injected by picocli
 
     @CommandLine.Option(names = { "-h", "--host" }, description = "Node hostname or ip address")
     public String host = "127.0.0.1";
@@ -77,21 +81,28 @@ public class JmxConnectionMixin
     {
         CommandLine.Model.CommandSpec jmx = parseResult.commandSpec().mixins().get(MIXIN_KEY);
         if (jmx == null)
-            throw new CommandLine.InitializationException("No JmxConnect mixin found in the command hierarchy");
+            throw new CommandLine.InitializationException("No JmxConnect command found in the top-level hierarchy");
 
-        CommandLine.Model.CommandSpec lastParent = lastExecutableSubcommandWithSameParent(parseResult.asCommandLineList());
-        if (lastParent.userObject() instanceof BaseCommand)
-            ((BaseCommand) lastParent.userObject()).setBridge(((JmxConnectionMixin) jmx.userObject()).init(lastParent));
-        return new CommandLine.RunLast().execute(parseResult);
+        try (CommandInvoker invoker = new CommandInvoker((JmxConnect) jmx.userObject()))
+        {
+            return invoker.execute(parseResult);
+        }
+        catch (CommandInvoker.CloseException e)
+        {
+            jmx.commandLine()
+               .getErr()
+               .println("Failed to connect to JMX: " + e.getMessage());
+            return CommandLine.ExitCode.SOFTWARE;
+        }
     }
 
     /**
-     * Initialize the JMX connection to the Cassandra node.
-     * @param spec The command specification to be executed after the initialization.
-     * @return The ServiceBridge instance to interact with the Cassandra node.
+     * Initialize the JMX connection to the Cassandra node using the provided options.
      */
-    private ServiceMBeanBridge init(CommandLine.Model.CommandSpec spec)
+    @Override
+    protected void execute(ServiceMBeanBridge probe)
     {
+        assert probe == null;
         try
         {
             if (isNotEmpty(username)) {
@@ -102,7 +113,7 @@ public class JmxConnectionMixin
                     password = promptAndReadPassword();
             }
 
-            return username.isEmpty() ? nodeProbeFactory.create(host, parseInt(port))
+            bridge = username.isEmpty() ? nodeProbeFactory.create(host, parseInt(port))
                                       : nodeProbeFactory.create(host, parseInt(port), username, password);
         }
         catch (IOException | SecurityException e)
@@ -111,6 +122,57 @@ public class JmxConnectionMixin
             output.err.printf("nodetool: Failed to connect to '%s:%s' - %s: '%s'.%n", host, port,
                               rootCause.getClass().getSimpleName(), rootCause.getMessage());
             throw new CommandLine.ExecutionException(spec.commandLine(), "Failed to connect to JMX", e);
+        }
+    }
+
+    @Override
+    public void close() throws Exception
+    {
+        if (bridge instanceof AutoCloseable)
+            ((AutoCloseable) bridge).close();
+    }
+
+    private static class CommandInvoker implements CommandLine.IExecutionStrategy, AutoCloseable
+    {
+        private final JmxConnect connect;
+
+        public CommandInvoker(JmxConnect connect)
+        {
+            this.connect = connect;
+        }
+
+        @Override
+        public int execute(CommandLine.ParseResult parseResult) throws CommandLine.ExecutionException, CommandLine.ParameterException
+        {
+            CommandLine.Model.CommandSpec lastParent = lastExecutableSubcommandWithSameParent(parseResult.asCommandLineList());
+            if (lastParent.userObject() instanceof BaseCommand)
+            {
+                connect.run();
+                ((BaseCommand) lastParent.userObject()).setBridge(connect.getBridge());
+            }
+            return new CommandLine.RunLast().execute(parseResult);
+        }
+
+        @Override
+        public void close() throws CloseException
+        {
+            try
+            {
+                if (connect.getBridge() instanceof AutoCloseable)
+                    ((AutoCloseable) connect.getBridge()).close();
+            }
+            catch (Exception e)
+            {
+                throw new CloseException("Failed to close JMX connection", e);
+            }
+        }
+
+        private static class CloseException extends RuntimeException
+        {
+            public CloseException(String message, Throwable cause)
+            {
+                super(message, cause);
+            }
         }
     }
 }
