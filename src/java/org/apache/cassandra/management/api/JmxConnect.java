@@ -80,11 +80,11 @@ public class JmxConnect extends BaseCommand implements AutoCloseable
         if (jmx == null)
             throw new CommandLine.InitializationException("No JmxConnect command found in the top-level hierarchy");
 
-        try (CommandInvoker invoker = new CommandInvoker((JmxConnect) jmx.userObject()))
+        try (JmxConnectionCommandInvoker invoker = new JmxConnectionCommandInvoker((JmxConnect) jmx.userObject()))
         {
             return invoker.execute(parseResult);
         }
-        catch (CommandInvoker.CloseException e)
+        catch (JmxConnectionCommandInvoker.CloseException e)
         {
             jmx.commandLine()
                .getErr()
@@ -129,11 +129,11 @@ public class JmxConnect extends BaseCommand implements AutoCloseable
             ((AutoCloseable) bridge).close();
     }
 
-    private static class CommandInvoker implements CommandLine.IExecutionStrategy, AutoCloseable
+    private static class JmxConnectionCommandInvoker implements CommandLine.IExecutionStrategy, AutoCloseable
     {
         private final JmxConnect connect;
 
-        public CommandInvoker(JmxConnect connect)
+        public JmxConnectionCommandInvoker(JmxConnect connect)
         {
             this.connect = connect;
         }
